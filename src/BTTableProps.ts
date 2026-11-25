@@ -3,7 +3,7 @@ import type { ControlProps } from './components/Controls';
 import type { RowCallbacks } from './components/TableBody';
 import type { Column, FetchRows, Query } from './core/types';
 import type { VirtualizeMode } from './core/virtual';
-import type { RowId } from './hooks/rowModel';
+import type { RowId, RowSource } from './hooks/rowModel';
 import type { ClientTableState } from './hooks/useClientTable';
 import type { BTTableLabels } from './labels';
 
@@ -13,7 +13,8 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
   /** Should be stable (memoized): a new array re-derives and re-renders every row on every parent render. */
   columns: readonly Column<R>[];
   /**
-   * Default: `row.id ?? row.ID ?? row.INDEX ?? row.N_ID`, else the index. Selection needs
+   * Default: `row.id ?? row.ID ?? row.INDEX ?? row.N_ID`, else the map key (rows given as
+   * a map), else the index; `index` is the array index or the map position. Selection needs
    * stable ids; in server mode the index is the position within the page, so ids collide
    * across pages: server rows need real ids. Should be stable (memoized): a new function
    * re-derives every row on every parent render.
@@ -51,17 +52,26 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
   emptyMessage?: ReactNode;
   /** Visually hidden table caption, for assistive technology. */
   caption?: ReactNode;
+  /** `false` renders no `<thead>`: no sort buttons and no select-all box. Default true. */
+  showTableHeader?: boolean;
   className?: string;
+  /** Extra class on the `<table>`. */
+  tableClassName?: string;
+  /** Extra class on the `<thead>`. */
+  theadClassName?: string;
+  /** Extra class on the `<tbody>`. */
+  tbodyClassName?: string;
   onError?: (error: Error, info: ErrorInfo) => void;
   labels?: Partial<BTTableLabels>;
 };
 
 /**
- * Client mode: the rows in memory. Should be stable (memoized): a new array re-filters and
+ * Client mode: the rows in memory, an array or an object map (values in property order,
+ * keys as the id fallback). Should be stable (memoized): a new array re-filters and
  * re-sorts every row; it keeps the scroll position unless the view (page, sort, search,
  * filters) changes.
  */
-export type BTTableClientProps<R> = BTTableCommonProps<R> & { rows: readonly R[]; fetchRows?: never };
+export type BTTableClientProps<R> = BTTableCommonProps<R> & { rows: RowSource<R>; fetchRows?: never };
 
 /**
  * Server mode: the data source, called for each page. A new function identity does not
@@ -73,4 +83,4 @@ export type BTTableServerProps<R> = BTTableCommonProps<R> & { fetchRows: FetchRo
 export type BTTableProps<R> = BTTableClientProps<R> | BTTableServerProps<R>;
 
 /** The props as the table reads them inside: either source, checked at runtime. */
-export type BTTableAnyProps<R> = BTTableCommonProps<R> & { rows?: readonly R[]; fetchRows?: FetchRows<R> };
+export type BTTableAnyProps<R> = BTTableCommonProps<R> & { rows?: RowSource<R>; fetchRows?: FetchRows<R> };

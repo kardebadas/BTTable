@@ -19,4 +19,11 @@ describe('BTTableProps', () => {
     const neither = <BTTable columns={COLUMNS} />;
     expect([client, server, both, neither]).toHaveLength(4);
   });
+
+  it('accepts rows as an object map of the column row type', () => {
+    const map = <BTTable columns={COLUMNS} rows={{ a: ROWS[0] }} />;
+    // @ts-expect-error -- map values must be rows
+    const wrong = <BTTable columns={COLUMNS} rows={{ a: 1 }} />;
+    expect([map, wrong]).toHaveLength(2);
+  });
 });

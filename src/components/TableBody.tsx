@@ -1,5 +1,5 @@
-import { type HTMLAttributes, isValidElement, memo, type ReactNode } from 'react';
-import type { Column } from '../core/types';
+import { type HTMLAttributes, isValidElement, memo, type ReactNode, type TdHTMLAttributes } from 'react';
+import type { CellContext, Column } from '../core/types';
 import type { VirtualWindow } from '../core/virtual';
 import { formatValue, getColumnValue } from '../core/values';
 import type { RowEntry, RowId } from '../hooks/rowModel';
@@ -18,11 +18,30 @@ export type RowCallbacks<R> = {
   rowProps?: (row: R, index: number) => RowAttributes;
 };
 
-function cellContent<R>(column: Column<R>, entry: RowEntry<R>): ReactNode {
-  const value = getColumnValue(column, entry.row);
-  if (column.render) return column.render({ row: entry.row, value, rowIndex: entry.index, column });
-  if (isValidElement(value)) return value;
-  return formatValue(value);
+function cellContent<R>(ctx: CellContext<R>): ReactNode {
+  if (ctx.column.render) return ctx.column.render(ctx);
+  if (isValidElement(ctx.value)) return ctx.value;
+  return formatValue(ctx.value);
+}
+
+/** The column's `onCellClick` / `onCellChange` / `onCellBlur`, bound to this cell; none when unset. */
+function cellHandlers<R>(ctx: CellContext<R>): TdHTMLAttributes<HTMLTableCellElement> {
+  const { onCellClick, onCellChange, onCellBlur } = ctx.column;
+  return {
+    onClick: onCellClick && ((event) => onCellClick(event, ctx)),
+    onChange: onCellChange && ((event) => onCellChange(event, ctx)),
+    onBlur: onCellBlur && ((event) => onCellBlur(event, ctx)),
+  };
+}
+
+/** One body cell: content, classes and the column's cell handlers. */
+function Cell<R>({ column, entry }: { column: Column<R>; entry: RowEntry<R> }) {
+  const ctx: CellContext<R> = { row: entry.row, value: getColumnValue(column, entry.row), rowIndex: entry.index, rowId: entry.id, column };
+  return (
+    <td className={cx('btt-cell', alignClass(column.align), cellClass(column, entry.row))} {...cellHandlers(ctx)}>
+      {cellContent(ctx)}
+    </td>
+  );
 }
 
 function cellClass<R>(column: Column<R>, row: R): string | undefined {
@@ -55,25 +74,25 @@ function SelectCell({ id, selected, onToggle, label }: SelectCellProps) {
 type RowProps<R> = RowCallbacks<R> & {
   entry: RowEntry<R>;
   columns: readonly Column<R>[];
-  /** Index in the whole list, 0-based: drives the odd/even class and `aria-rowindex` (the header row is 1). */
+  /** Index in the whole list, 0-based: drives the odd/even class and `aria-rowindex`. */
   position: number;
+  /** Rows above the body counted by `aria-rowindex`: 1 with the header row, 0 without. */
+  headerRows: number;
   selectable: boolean;
   selected: boolean;
   onToggleRow?: (id: RowId) => void;
   selectRowLabel?: string;
 };
 
-function Row<R>({ entry, columns, position, selectable, rowClassName, rowProps, ...select }: RowProps<R>) {
+function Row<R>({ entry, columns, position, headerRows, selectable, rowClassName, rowProps, ...select }: RowProps<R>) {
   const attributes = rowProps?.(entry.row, entry.index) ?? {};
   const parity = position % 2 === 0 ? 'btt-row--odd' : 'btt-row--even';
   const className = cx('btt-row', parity, rowClassName?.(entry.row, entry.index), attributes.className);
   return (
-    <tr {...attributes} className={className} aria-rowindex={position + 2}>
+    <tr {...attributes} className={className} aria-rowindex={position + headerRows + 1}>
       {selectable && <SelectCell id={entry.id} selected={select.selected} onToggle={select.onToggleRow} label={select.selectRowLabel} />}
       {columns.map((column) => (
-        <td key={column.key} className={cx('btt-cell', alignClass(column.align), cellClass(column, entry.row))}>
-          {cellContent(column, entry)}
-        </td>
+        <Cell key={column.key} column={column} entry={entry} />
       ))}
     </tr>
   );
@@ -93,6 +112,10 @@ export type TableBodyProps<R> = RowCallbacks<R> & {
   range?: VirtualWindow;
   /** Row checkboxes of the selection column; without it the cells stay empty. */
   selection?: RowSelection;
+  /** Rows above the body counted by `aria-rowindex`. Default 1 (the header row). */
+  headerRows?: number;
+  /** Extra class on the `<tbody>`. */
+  className?: string;
 };
 
 /** Stands in for unmounted rows: one cell spanning every column, no widths, hidden from assistive technology. */
@@ -111,11 +134,11 @@ function Spacer({ height, colSpan }: { height: number; colSpan: number }) {
  * `RowEntry`, whatever the data source.
  */
 export function TableBody<R>(props: TableBodyProps<R>) {
-  const { entries, columns, selectable, loading, emptyMessage, range, selection, ...callbacks } = props;
+  const { entries, columns, selectable, loading, emptyMessage, range, selection, headerRows = 1, className, ...callbacks } = props;
   const colSpan = columns.length + (selectable ? 1 : 0);
   if (entries.length === 0) {
     return (
-      <tbody>
+      <tbody className={className}>
         {!loading && (
           <tr className="btt-empty-row">
             <td className="btt-empty" colSpan={colSpan}>
@@ -128,7 +151,7 @@ export function TableBody<R>(props: TableBodyProps<R>) {
   }
   const { start = 0, end = entries.length, padTop = 0, padBottom = 0 } = range ?? {};
   return (
-    <tbody>
+    <tbody className={className}>
       <Spacer height={padTop} colSpan={colSpan} />
       {entries.slice(start, end).map((entry, offset) => (
         <MemoRow
@@ -136,6 +159,7 @@ export function TableBody<R>(props: TableBodyProps<R>) {
           entry={entry}
           columns={columns}
           position={start + offset}
+          headerRows={headerRows}
           selectable={selectable}
           selected={selection?.isSelected(entry.id) ?? false}
           onToggleRow={selection?.toggleRow}

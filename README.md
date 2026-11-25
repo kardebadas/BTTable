@@ -120,9 +120,12 @@ type Column<R> = {
   filter?: FilterSpec;
   cellClassName?: string | ((row: R) => string | undefined);
   headerClassName?: string;
+  onCellClick?: (event: MouseEvent<HTMLTableCellElement>, ctx: CellContext<R>) => void;
+  onCellChange?: (event: FormEvent<HTMLTableCellElement>, ctx: CellContext<R>) => void;
+  onCellBlur?: (event: FocusEvent<HTMLTableCellElement>, ctx: CellContext<R>) => void;
 };
 
-type CellContext<R> = { row: R; value: unknown; rowIndex: number; column: Column<R> };
+type CellContext<R> = { row: R; value: unknown; rowIndex: number; rowId: string | number; column: Column<R> };
 ```
 
 | Field | Default | Meaning |
@@ -134,7 +137,7 @@ type CellContext<R> = { row: R; value: unknown; rowIndex: number; column: Column
 | `minWidth` | `60` | Px. Each column adds its numeric `width`, else its `minWidth`, to the table's `min-width`; below that the table scrolls horizontally. |
 | `align` | `'left'` | Header and cell alignment. |
 | `value` | `row[key]` | The raw value used for display, sorting, search, filters and export unless a more specific function is given. |
-| `render` | the formatted value | Cell content. Default formatting: `null`/`undefined`/`NaN` → empty, booleans → `Yes`/`No`, dates → `M/D/YYYY`, arrays comma-joined, React elements as is. `rowIndex` is the row's index in `rows`. |
+| `render` | the formatted value | Cell content. Default formatting: `null`/`undefined`/`NaN` → empty, booleans → `Yes`/`No`, dates → `M/D/YYYY`, arrays comma-joined, React elements as is. `rowIndex` is the row's index in `rows` (a map: its position); `rowId` is its id. |
 | `sortable` | `true` | `false` renders a plain header with no sort button. |
 | `sortValue` | `value` | The value the column sorts by. |
 | `searchable` | `true` | `false` leaves the column out of the global search. |
@@ -143,6 +146,12 @@ type CellContext<R> = { row: R; value: unknown; rowIndex: number; column: Column
 | `filter` | none | A filter widget for this column; see [Filters](#filters). |
 | `cellClassName` | none | Class for every body cell of the column, or a function of the row. |
 | `headerClassName` | none | Class for the header cell. |
+| `onCellClick` | none | `(event, ctx) => void` on a click in a body cell of the column; `ctx` is the `CellContext` (with `rowId`). |
+| `onCellChange` | none | `(event, ctx) => void` on a change event bubbling from an input inside the cell (`event.target` is the input). |
+| `onCellBlur` | none | `(event, ctx) => void` on a blur bubbling from an element inside the cell. |
+
+The cell handlers sit on the `<td>`; clicks on the selection checkbox never reach them.
+They come from `columns`, so keep the columns stable and rows stay memoized.
 
 `render`, `value`, `sortValue` and the other functions are plain functions called by the
 table, not components: **do not call hooks inside them**. If a cell needs state or effects,
@@ -150,10 +159,15 @@ return a component from `render` (`render: ({ row }) => <StatusCell row={row} />
 
 ## Rows and ids
 
-- `rows: readonly R[]` — client mode data. Entries that are `null` or not objects are
-  skipped, with a warning in development (server mode warns the same way for each response).
+- `rows: readonly R[] | Record<string, R>` — client mode data: an array, or an object map
+  whose values are the rows (in property order, so integer-like keys come first, ascending)
+  and whose keys are the id fallback. Entries that are `null` or not objects are skipped,
+  with a warning in development (server mode warns the same way for each response).
 - `getRowId?: (row, index) => string | number` — the default is the first string or number
-  among `row.id`, `row.ID`, `row.INDEX`, `row.N_ID`, else the row's index in `rows`. Ids are
+  among `row.id`, `row.ID`, `row.INDEX`, `row.N_ID`, else the map key (rows given as a map),
+  else the row's index in `rows`. `index` is the array index, or the position in a map. Ids
+  taken from map keys are strings (`'7'`, not `7`): pass them as strings in `selectedIds` /
+  `defaultSelectedIds`, or set `getRowId`. Ids are
   React keys, height-cache keys and selection ids. **Selection needs stable ids**: an index
   changes when rows are reordered or replaced, and in server mode it is the position on the
   page, so it collides across pages. Server rows need real ids (development warning when a
@@ -178,9 +192,9 @@ or the load error has the class `btt-empty-row` instead.
 | Prop | Default | Meaning |
 | --- | --- | --- |
 | `columns` | required | Column definitions. Keep the array stable (module-level or `useMemo`). |
-| `rows` | – | Client mode data. Keep the array stable: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
+| `rows` | – | Client mode data: an array or an object map (keys are the id fallback). Keep the array stable: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
 | `fetchRows` | – | Server mode data source; see [Server mode](#server-mode). A new function identity does not refetch. |
-| `getRowId` | `id`/`ID`/`INDEX`/`N_ID`, else index | Row id; see [Rows and ids](#rows-and-ids). |
+| `getRowId` | `id`/`ID`/`INDEX`/`N_ID`, else map key, else index | Row id; see [Rows and ids](#rows-and-ids). |
 | `rowClassName` | – | `(row, index) => class`. Keep it stable. |
 | `rowProps` | – | `(row, index) => <tr> attributes`. Keep it stable. |
 
@@ -227,7 +241,11 @@ or the load error has the class `btt-empty-row` instead.
 | `loading` | `false` | Shows "Loading…" in the status strip, dims the rows and sets `aria-busy`, without unmounting rows or moving the layout. In server mode the table also sets it while a request is in flight. |
 | `emptyMessage` | `'No records found'` | Any React node, shown when no row matches (hidden while loading). |
 | `caption` | – | Visually hidden `<caption>` naming the table for assistive technology. |
+| `showTableHeader` | `true` | `false` renders no `<thead>`: no sort buttons and no select-all box (row checkboxes stay). Column widths still come from `columns`. |
 | `className` | – | Extra class on the root `.btt` element. |
+| `tableClassName` | – | Extra class on the `<table>` (after `btt-table`). |
+| `theadClassName` | – | Extra class on the `<thead>` (after `btt-thead`). |
+| `tbodyClassName` | – | Extra class on the `<tbody>`. |
 | `labels` | English | Partial override of every UI string; see [Labels](#labels-i18n). |
 | `locale` | runtime locale | Locale of the counter and page-count numbers (e.g. `'en-US'`). Pass a fixed one when server rendering; see [Server-side rendering](#server-side-rendering). |
 | `onError` | – | `(error, info) => void` when a render error is caught by the table's error boundary. |
@@ -517,7 +535,8 @@ Do not give `th`/`td` widths of your own: column widths come from `columns` only
 - `aria-busy` is set on the table while loading; the status strip is
   `role="status" aria-live="polite"`.
 - The table sets `aria-rowcount` and every row its `aria-rowindex`, so positions stay right
-  when rows are virtualized; spacer rows are hidden from assistive technology.
+  when rows are virtualized; spacer rows are hidden from assistive technology. With
+  `showTableHeader={false}` no header row is counted (the first body row is 1).
 - Pagination is a `<nav aria-label="Pagination">` with real buttons, a labelled page box
   (Enter or blur commits, clamped into range) and a labelled page-size select.
 - Every filter has a `<label>` bound to its control. The multi-select is a button
@@ -554,7 +573,7 @@ error tints (without them, no tint).
 Besides `BTTable` and its types (`BTTableProps`, `BTTableClientProps`, `BTTableServerProps`,
 `BTTableCommonProps`, `Column`, `CellContext`, `FilterSpec`,
 `FilterState`, `FilterValue`, `Option`, `TextOp`, `NumberOp`, `DateOp`, `SortState`, `Query`,
-`FetchResult`, `FetchRows`, `ExportData`, `RowId`, `RowAttributes`, `ClientTableState`,
+`FetchResult`, `FetchRows`, `ExportData`, `RowId`, `RowSource`, `CellHandler`, `RowAttributes`, `ClientTableState`,
 `BTTableLabels`, `VirtualizeMode`), the package exports `DEFAULT_LABELS` and the helpers it
 uses itself:
 

@@ -77,6 +77,8 @@ export type TableHeadProps<R> = {
   selectable: boolean;
   /** The select-all checkbox of the selection column; without it the slot stays empty. */
   selectAll?: SelectAllState;
+  /** Extra class on the `<thead>`. */
+  className?: string;
 };
 
 /**
@@ -84,9 +86,9 @@ export type TableHeadProps<R> = {
  * (click or Enter cycles asc → desc → none), or the bare header when `sortable` is false.
  * When `selectable`, the first header cell holds the select-all checkbox.
  */
-export function TableHead<R>({ columns, sort, onSort, selectable, selectAll }: TableHeadProps<R>) {
+export function TableHead<R>({ columns, sort, onSort, selectable, selectAll, className }: TableHeadProps<R>) {
   return (
-    <thead className="btt-thead" style={STICKY}>
+    <thead className={cx('btt-thead', className)} style={STICKY}>
       <tr aria-rowindex={1}>
         {selectable && (
           <th scope="col" className="btt-th btt-th--select">

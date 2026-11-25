@@ -3,6 +3,7 @@ export const VERSION = '0.1.0';
 
 export type {
   CellContext,
+  CellHandler,
   Column,
   DateOp,
   ExportData,
@@ -24,7 +25,7 @@ export { formatValue } from './core/values';
 export { BTTable } from './BTTable';
 export type { BTTableClientProps, BTTableCommonProps, BTTableProps, BTTableServerProps } from './BTTableProps';
 export type { RowAttributes } from './components/TableBody';
-export type { RowId } from './hooks/rowModel';
+export type { RowId, RowSource } from './hooks/rowModel';
 export type { ClientTableState } from './hooks/useClientTable';
 export { type BTTableLabels, DEFAULT_LABELS } from './labels';
 export type { VirtualizeMode } from './core/virtual';

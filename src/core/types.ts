@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { FocusEvent, FormEvent, MouseEvent, ReactNode } from 'react';
 
 /** One choice of a `select` or `multiselect` filter. */
 export type Option = { value: string; label: ReactNode };
@@ -41,8 +41,11 @@ export type FilterState = Record<string, FilterValue>;
 /** Active sort, or `null` when unsorted. */
 export type SortState = { key: string; direction: 'asc' | 'desc' } | null;
 
-/** What a custom cell `render` receives. */
-export type CellContext<R> = { row: R; value: unknown; rowIndex: number; column: Column<R> };
+/** What a custom cell `render` and the cell handlers receive. `rowId` is the row's id (see `getRowId`). */
+export type CellContext<R> = { row: R; value: unknown; rowIndex: number; rowId: string | number; column: Column<R> };
+
+/** A per-cell event handler of a column, attached to the body `<td>`. */
+export type CellHandler<R, E> = (event: E, ctx: CellContext<R>) => void;
 
 /** One table column. `key` is unique and is also the default accessor (`row[key]`). */
 export type Column<R> = {
@@ -62,6 +65,12 @@ export type Column<R> = {
   filter?: FilterSpec;
   cellClassName?: string | ((row: R) => string | undefined);
   headerClassName?: string;
+  /** Click on a body cell of this column. Keep columns stable: rows are memoized on them. */
+  onCellClick?: CellHandler<R, MouseEvent<HTMLTableCellElement>>;
+  /** Change event bubbling from an input inside a body cell of this column. */
+  onCellChange?: CellHandler<R, FormEvent<HTMLTableCellElement>>;
+  /** Blur event bubbling from an element inside a body cell of this column. */
+  onCellBlur?: CellHandler<R, FocusEvent<HTMLTableCellElement>>;
 };
 
 /** Server-mode request built by the table for `fetchRows`. */

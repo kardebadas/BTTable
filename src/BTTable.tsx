@@ -10,7 +10,7 @@ import { getCounter } from './core/pagination';
 import type { FetchRows, SortState } from './core/types';
 import { ownRowId } from './core/values';
 import { shouldVirtualize } from './core/virtual';
-import type { RowEntry } from './hooks/rowModel';
+import type { RowEntry, RowSource } from './hooks/rowModel';
 import { type ClientTable as ClientTableModel, useClientTable } from './hooks/useClientTable';
 import { type ServerTable as ServerTableModel, useServerTable } from './hooks/useServerTable';
 import { isDevelopment, useRowWarnings } from './hooks/useRowWarnings';
@@ -69,18 +69,10 @@ function selectionControls<R>({ controls, selectable, labels }: ViewProps<R>) {
   };
 }
 
-/** The scroll container and the table: fixed layout, sticky header, rows virtualized when on. */
-function TableScroll<R>(props: ViewProps<R>) {
-  const { columns, entries, labels, selectable = false, loading = false, emptyMessage = 'No records found' } = props;
-  const { scrollRef, enabled, range, maxHeight } = useTableVirtualization(props);
-  const { selectAll, rowSelection } = selectionControls(props);
-  // Collapsed borders: no border-spacing between rows, so rows sit exactly at their measured offsets.
-  const tableStyle = { tableLayout: 'fixed', borderCollapse: 'collapse', width: '100%', minWidth: tableMinWidth(columns, selectable) } as const;
-  // A stable gutter keeps the vertical scrollbar from taking width from the columns when it appears.
-  // Virtualization keeps the view anchored itself, so the browser's scroll anchoring must not also adjust it.
-  const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(maxHeight), overflowAnchor: enabled ? 'none' : undefined } as const;
-  const bodyFallback = (
-    <tbody>
+/** The body shown when rendering the rows fails. */
+function bodyFallback<R>({ columns, selectable, labels, tbodyClassName }: ViewProps<R>) {
+  return (
+    <tbody className={tbodyClassName}>
       <tr>
         <td className="btt-error" role="alert" colSpan={columns.length + (selectable ? 1 : 0)}>
           {labels.error}
@@ -88,24 +80,29 @@ function TableScroll<R>(props: ViewProps<R>) {
       </tr>
     </tbody>
   );
+}
+
+/** The scroll container and the table: fixed layout, sticky header (unless hidden), rows virtualized when on. */
+function TableScroll<R>(props: ViewProps<R>) {
+  const { columns, entries, selectable = false, loading = false, emptyMessage = 'No records found', showTableHeader = true } = props;
+  const { scrollRef, enabled, range, maxHeight } = useTableVirtualization(props);
+  const { selectAll, rowSelection } = selectionControls(props);
+  const headerRows = showTableHeader ? 1 : 0;
+  // Collapsed borders: no border-spacing between rows, so rows sit exactly at their measured offsets.
+  const tableStyle = { tableLayout: 'fixed', borderCollapse: 'collapse', width: '100%', minWidth: tableMinWidth(columns, selectable) } as const;
+  // A stable gutter keeps the vertical scrollbar from taking width from the columns when it appears.
+  // Virtualization keeps the view anchored itself, so the browser's scroll anchoring must not also adjust it.
+  const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(maxHeight), overflowAnchor: enabled ? 'none' : undefined } as const;
+  const head = { columns, sort: props.sort, onSort: props.onSort, selectable, selectAll, className: props.theadClassName };
+  const body = { entries, columns, selectable, loading, emptyMessage, range, selection: rowSelection, headerRows };
   return (
     <div className="btt-scroll" style={scrollStyle} ref={scrollRef}>
-      <table className="btt-table" style={tableStyle} aria-busy={loading} aria-rowcount={entries.length + 1}>
+      <table className={cx('btt-table', props.tableClassName)} style={tableStyle} aria-busy={loading} aria-rowcount={entries.length + headerRows}>
         {props.caption !== undefined && <caption className="btt-caption">{props.caption}</caption>}
         <ColGroup columns={columns} selectable={selectable} />
-        <TableHead columns={columns} sort={props.sort} onSort={props.onSort} selectable={selectable} selectAll={selectAll} />
-        <ErrorBoundary fallback={bodyFallback} onError={props.onError} resetKey={entries}>
-          <TableBody
-            entries={entries}
-            columns={columns}
-            selectable={selectable}
-            loading={loading}
-            emptyMessage={emptyMessage}
-            range={range}
-            selection={rowSelection}
-            rowClassName={props.rowClassName}
-            rowProps={props.rowProps}
-          />
+        {showTableHeader && <TableHead {...head} />}
+        <ErrorBoundary fallback={bodyFallback(props)} onError={props.onError} resetKey={entries}>
+          <TableBody {...body} className={props.tbodyClassName} rowClassName={props.rowClassName} rowProps={props.rowProps} />
         </ErrorBoundary>
       </table>
     </div>
@@ -139,7 +136,7 @@ function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): 
   return { ...table, counter, exportData };
 }
 
-function ClientTable<R>(props: ContentProps<R> & { rows: readonly R[] }) {
+function ClientTable<R>(props: ContentProps<R> & { rows: RowSource<R> }) {
   const table = useClientTable(props);
   useRowWarnings(props.rows, table.entries);
   const controls = clientControls(table, props);

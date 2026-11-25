@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { clampPage, pageCount, paginate } from '../core/pagination';
 import type { Column, FilterState, SortState } from '../core/types';
-import { getRowId as defaultGetRowId } from '../core/values';
-import { buildEntries, filterEntries, type RowEntry, type RowId, sortEntries } from './rowModel';
+import { buildEntries, filterEntries, type RowEntry, type RowId, type RowSource, sortEntries } from './rowModel';
 import type { TableState } from './tableReducer';
 import { useLatest } from './useLatest';
 import { type Selection, useSelection } from './useSelection';
@@ -20,7 +19,8 @@ export type ClientTableState<R> = {
 
 /** Input of `useClientTable`; the client-mode subset of the table props. */
 export type UseClientTableOptions<R> = {
-  rows: readonly R[];
+  /** An array, or an object map whose keys are the id fallback. */
+  rows: RowSource<R>;
   /** Should be stable (memoized): a new array re-filters and re-sorts every row. */
   columns: readonly Column<R>[];
   /** Should be stable (memoized): a new function re-derives every row. */
@@ -81,7 +81,7 @@ function useStateChange<R>(state: ClientTableState<R>, onStateChange?: (state: C
 
 /** Filtered → sorted rows, memoized per input. */
 function useFilteredRows<R>(options: UseClientTableOptions<R>, state: TableState) {
-  const { rows, columns, getRowId = defaultGetRowId } = options;
+  const { rows, columns, getRowId } = options;
   const entries = useMemo(() => buildEntries(rows, getRowId), [rows, getRowId]);
   const { search, filters, sort } = state;
   const filtered = useMemo(() => filterEntries({ entries, columns, search, filters }), [entries, columns, search, filters]);

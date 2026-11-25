@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import type { RowEntry } from './rowModel';
+import { type RowEntry, type RowSource, sourceSize } from './rowModel';
 
 /**
  * True unless `process.env.NODE_ENV` is `'production'`. Bundlers replace that expression
@@ -20,12 +20,12 @@ function duplicateIdCount<R>(entries: readonly RowEntry<R>[]): number {
 }
 
 /**
- * Development warnings about a row source (the `rows` prop, or one server response): rows
+ * Development warnings about a row source (the `rows` prop, array or map, or one server response): rows
  * skipped as invalid (null or not an object) and rows whose id repeats an earlier one.
  * Each warns once per change of `rows`, not on every render.
  */
-export function useRowWarnings<R>(rows: readonly unknown[], entries: readonly RowEntry<R>[]): void {
-  const skipped = rows.length - entries.length;
+export function useRowWarnings<R>(rows: RowSource<unknown>, entries: readonly RowEntry<R>[]): void {
+  const skipped = sourceSize(rows) - entries.length;
   const duplicates = useMemo(() => duplicateIdCount(entries), [entries]);
   useEffect(() => {
     if (!isDevelopment()) return;
