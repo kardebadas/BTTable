@@ -12,6 +12,7 @@ describe('package entry', () => {
     expect(typeof api.parseDate).toBe('function');
     expect(typeof api.compareValues).toBe('function');
     expect(typeof api.formatValue).toBe('function');
+    expect(typeof api.BTTable).toBe('function');
   });
 
   it('runs in jsdom with jest-dom matchers', () => {

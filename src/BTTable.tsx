@@ -1,0 +1,161 @@
+import { type ErrorInfo, type ReactNode, useEffect } from 'react';
+import { cx } from './components/classNames';
+import { ColGroup, tableMinWidth, toCssSize } from './components/ColGroup';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { type RowCallbacks, TableBody } from './components/TableBody';
+import { TableHead } from './components/TableHead';
+import type { Column, FetchRows, SortState } from './core/types';
+import type { RowEntry, RowId } from './hooks/rowModel';
+import { type ClientTableState, useClientTable } from './hooks/useClientTable';
+import { type BTTableLabels, DEFAULT_LABELS } from './labels';
+
+/** Props of `BTTable`. Pass exactly one of `rows` (client mode) or `fetchRows` (server mode). */
+export type BTTableProps<R> = RowCallbacks<R> & {
+  /** Should be stable (memoized): a new array re-derives and re-renders every row. */
+  columns: readonly Column<R>[];
+  rows?: readonly R[];
+  fetchRows?: FetchRows<R>;
+  /**
+   * Default: `row.id ?? row.ID ?? row.INDEX ?? row.N_ID`, else the index. Selection needs
+   * stable ids. Should be stable (memoized): a new function re-derives every row.
+   */
+  getRowId?: (row: R, index: number) => RowId;
+  pagination?: boolean;
+  pageSize?: number;
+  searchDebounceMs?: number;
+  resetKey?: unknown;
+  onStateChange?: (state: ClientTableState<R>) => void;
+  selectable?: boolean;
+  selectedIds?: readonly RowId[];
+  defaultSelectedIds?: readonly RowId[];
+  onSelectionChange?: (ids: RowId[]) => void;
+  /** Number px or CSS size; `'none'` turns the inner vertical scroll off. Default 600. */
+  maxHeight?: number | string;
+  loading?: boolean;
+  emptyMessage?: ReactNode;
+  /** Visually hidden table caption, for assistive technology. */
+  caption?: ReactNode;
+  className?: string;
+  onError?: (error: Error, info: ErrorInfo) => void;
+  labels?: Partial<BTTableLabels>;
+};
+
+type ContentProps<R> = BTTableProps<R> & { labels: BTTableLabels };
+
+type ViewProps<R> = ContentProps<R> & {
+  entries: readonly RowEntry<R>[];
+  sort: SortState;
+  onSort: (key: string) => void;
+};
+
+const NO_ENTRIES: RowEntry<never>[] = [];
+const ignoreSort = () => {};
+/** The status strip always keeps one line of height, so loading never shifts the table. */
+const STATUS_STYLE = { minHeight: '1.5em' } as const;
+
+/**
+ * True unless `process.env.NODE_ENV` is `'production'`. Bundlers replace that expression
+ * text even where `process` does not exist, so it must be read directly, not behind a
+ * `typeof process` guard; without a bundler the read throws and counts as development.
+ */
+function isDevelopment(): boolean {
+  try {
+    return process.env.NODE_ENV !== 'production';
+  } catch {
+    return true;
+  }
+}
+
+/** Throws when not exactly one of `rows` / `fetchRows` is passed. */
+function assertOneSource<R>({ rows, fetchRows }: BTTableProps<R>): void {
+  const hasRows = rows !== undefined && rows !== null;
+  if (hasRows !== Boolean(fetchRows)) return;
+  const got = hasRows ? 'both' : 'neither';
+  throw new Error(`BTTable: pass exactly one of \`rows\` or \`fetchRows\` (got ${got}).`);
+}
+
+/** Warns once per `rows` change, in development, when invalid rows were skipped. */
+function useInvalidRowWarning(rows: readonly unknown[], validCount: number): void {
+  const skipped = rows.length - validCount;
+  useEffect(() => {
+    if (skipped > 0 && isDevelopment()) {
+      console.warn(`BTTable: skipped ${skipped} invalid rows (null or not an object).`);
+    }
+  }, [rows, skipped]);
+}
+
+function TableView<R>(props: ViewProps<R>) {
+  const { columns, entries, labels, selectable = false, loading = false, emptyMessage = 'No records found' } = props;
+  const tableStyle = { tableLayout: 'fixed', width: '100%', minWidth: tableMinWidth(columns, selectable) } as const;
+  // A stable gutter keeps the vertical scrollbar from taking width from the columns when it appears.
+  const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(props.maxHeight ?? 600) } as const;
+  const bodyFallback = (
+    <tbody>
+      <tr>
+        <td className="btt-error" role="alert" colSpan={columns.length + (selectable ? 1 : 0)}>
+          {labels.error}
+        </td>
+      </tr>
+    </tbody>
+  );
+  return (
+    <>
+      <div className={cx('btt-status', loading && 'btt-status--loading')} style={STATUS_STYLE} role="status" aria-live="polite">
+        {loading ? labels.loading : null}
+      </div>
+      <div className="btt-scroll" style={scrollStyle}>
+        <table className="btt-table" style={tableStyle} aria-busy={loading}>
+          {props.caption !== undefined && <caption className="btt-caption">{props.caption}</caption>}
+          <ColGroup columns={columns} selectable={selectable} />
+          <TableHead columns={columns} sort={props.sort} onSort={props.onSort} selectable={selectable} />
+          <ErrorBoundary fallback={bodyFallback} onError={props.onError} resetKey={entries}>
+            <TableBody
+              entries={entries}
+              columns={columns}
+              selectable={selectable}
+              loading={loading}
+              emptyMessage={emptyMessage}
+              rowClassName={props.rowClassName}
+              rowProps={props.rowProps}
+            />
+          </ErrorBoundary>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function ClientTable<R>(props: ContentProps<R> & { rows: readonly R[] }) {
+  const table = useClientTable(props);
+  useInvalidRowWarning(props.rows, table.totalRows);
+  return <TableView {...props} entries={table.pageRows} sort={table.sort} onSort={table.toggleSort} />;
+}
+
+/** Validates the mode, then renders client mode, or the empty shell for `fetchRows` (server mode). */
+function TableContent<R>(props: ContentProps<R>) {
+  assertOneSource(props);
+  if (props.rows) return <ClientTable {...props} rows={props.rows} />;
+  return <TableView {...props} entries={NO_ENTRIES} sort={null} onSort={ignoreSort} />;
+}
+
+/**
+ * Fixed-layout data table. Column widths come only from `columns` (a `<colgroup>` under
+ * `table-layout: fixed`), so headers never move with the mounted rows; the `<thead>` is
+ * sticky inside one scroll container. Render errors show a fallback and call `onError`;
+ * passing both or neither of `rows` / `fetchRows` is such an error.
+ */
+export function BTTable<R>(props: BTTableProps<R>) {
+  const labels = { ...DEFAULT_LABELS, ...props.labels };
+  const fallback = (
+    <div className="btt-error" role="alert">
+      {labels.error}
+    </div>
+  );
+  return (
+    <div className={cx('btt', props.className)}>
+      <ErrorBoundary fallback={fallback} onError={props.onError} resetKey={props.rows ?? props.fetchRows}>
+        <TableContent {...props} labels={labels} />
+      </ErrorBoundary>
+    </div>
+  );
+}

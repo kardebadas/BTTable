@@ -21,3 +21,8 @@ export { compareValues } from './core/compare';
 export { parseDate } from './core/dates';
 export { buildExportData, toCsv } from './core/export';
 export { formatValue } from './core/values';
+export { BTTable, type BTTableProps } from './BTTable';
+export type { RowAttributes } from './components/TableBody';
+export type { RowId } from './hooks/rowModel';
+export type { ClientTableState } from './hooks/useClientTable';
+export type { BTTableLabels } from './labels';
