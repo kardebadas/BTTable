@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type ChangeEvent, type CSSProperties, useLayoutEffect, useRef } from 'react';
 import { headerText } from '../core/export';
 import type { Column, SortState } from '../core/types';
 import { alignClass, cx } from './classNames';
@@ -48,24 +48,50 @@ function HeaderCell<R>({ column, sort, onSort }: HeaderCellProps<R>) {
   );
 }
 
+/** State of the header "select all" checkbox. */
+export type SelectAllState = { checked: boolean; indeterminate: boolean; onToggle: () => void; label: string };
+
+/**
+ * The header checkbox. `indeterminate` is a DOM property only, so it is synced after every
+ * render, and restored right after a click (which clears it natively) in case the owner
+ * of a controlled selection rejects the change and nothing re-renders.
+ */
+function SelectAllBox({ checked, indeterminate, onToggle, label }: SelectAllState) {
+  const ref = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  });
+  const change = (event: ChangeEvent<HTMLInputElement>) => {
+    event.currentTarget.indeterminate = indeterminate;
+    onToggle();
+  };
+  return <input ref={ref} type="checkbox" className="btt-select" aria-label={label} checked={checked} onChange={change} />;
+}
+
 /** Props of `TableHead`. */
 export type TableHeadProps<R> = {
   columns: readonly Column<R>[];
   sort: SortState;
   onSort: (key: string) => void;
   selectable: boolean;
+  /** The select-all checkbox of the selection column; without it the slot stays empty. */
+  selectAll?: SelectAllState;
 };
 
 /**
  * The sticky `<thead>`: one `<th aria-sort>` per column holding a sort `<button>`
  * (click or Enter cycles asc → desc → none), or the bare header when `sortable` is false.
- * When `selectable`, an empty first header cell is the selection column's slot.
+ * When `selectable`, the first header cell holds the select-all checkbox.
  */
-export function TableHead<R>({ columns, sort, onSort, selectable }: TableHeadProps<R>) {
+export function TableHead<R>({ columns, sort, onSort, selectable, selectAll }: TableHeadProps<R>) {
   return (
     <thead className="btt-thead" style={STICKY}>
       <tr aria-rowindex={1}>
-        {selectable && <th scope="col" className="btt-th btt-th--select" />}
+        {selectable && (
+          <th scope="col" className="btt-th btt-th--select">
+            {selectAll && <SelectAllBox {...selectAll} />}
+          </th>
+        )}
         {columns.map((column) => (
           <HeaderCell key={column.key} column={column} sort={sort} onSort={onSort} />
         ))}

@@ -76,6 +76,18 @@ describe('search', () => {
     expect(names(result.current.filteredRows)).toEqual(['Bruno']);
   });
 
+  it('clears the search at once, without waiting for the debounce', () => {
+    const { result } = setup({ searchDebounceMs: 1000 });
+    act(() => result.current.setSearch('br'));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(names(result.current.filteredRows)).toEqual(['Bruno']);
+    act(() => result.current.setSearch('bru'));
+    act(() => result.current.clearSearch());
+    expect(result.current.searchInput).toBe('');
+    expect(result.current.search).toBe('');
+    expect(result.current.filteredRows).toHaveLength(5);
+  });
+
   it('cancels a pending search typed back to the applied term', () => {
     const { result } = setup({ rows: many(30), pageSize: 10 });
     act(() => result.current.setPage(2));

@@ -51,6 +51,8 @@ export type ClientTable<R> = {
   /** The rows of the current page (all filtered rows when pagination is off). */
   pageRows: RowEntry<R>[];
   setSearch: (text: string) => void;
+  /** Empties the search box and applies the empty search at once, without the debounce. */
+  clearSearch: () => void;
   setFilter: (key: string, value: FilterValue) => void;
   toggleSort: (key: string) => void;
   setPage: (page: number) => void;
@@ -114,6 +116,10 @@ function useActions(dispatch: Dispatch<TableAction>) {
   return useMemo(
     () => ({
       setSearch: (text: string) => dispatch({ type: 'type', text }),
+      clearSearch: () => {
+        dispatch({ type: 'type', text: '' });
+        dispatch({ type: 'applySearch' });
+      },
       setFilter: (key: string, value: FilterValue) => dispatch({ type: 'filter', key, value }),
       toggleSort: (key: string) => dispatch({ type: 'sort', key }),
       setPage: (page: number) => dispatch({ type: 'page', page }),

@@ -1,18 +1,22 @@
 import { type ErrorInfo, type ReactNode, useEffect, useRef } from 'react';
 import { cx } from './components/classNames';
 import { ColGroup, tableMinWidth, toCssSize } from './components/ColGroup';
+import { type ControlProps, FooterControls, type TableControls, TopControls } from './components/Controls';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { type RowCallbacks, TableBody } from './components/TableBody';
 import { TableHead } from './components/TableHead';
+import { buildExportData } from './core/export';
+import { getCounter } from './core/pagination';
 import type { Column, FetchRows, SortState } from './core/types';
 import { shouldVirtualize, type VirtualizeMode } from './core/virtual';
 import type { RowEntry, RowId } from './hooks/rowModel';
-import { type ClientTableState, useClientTable } from './hooks/useClientTable';
+import { type ClientTable as ClientTableModel, type ClientTableState, useClientTable } from './hooks/useClientTable';
 import { useVirtualRows } from './hooks/useVirtualRows';
 import { type BTTableLabels, DEFAULT_LABELS } from './labels';
 
 /** Props of `BTTable`. Pass exactly one of `rows` (client mode) or `fetchRows` (server mode). */
-export type BTTableProps<R> = RowCallbacks<R> & {
+export type BTTableProps<R> = RowCallbacks<R> &
+  ControlProps & {
   /**
    * Should be stable (memoized): a new array re-derives and re-renders every row, and
    * scrolls the table back to the top, on every parent render.
@@ -59,6 +63,8 @@ type ViewProps<R> = ContentProps<R> & {
   entries: readonly RowEntry<R>[];
   sort: SortState;
   onSort: (key: string) => void;
+  /** Toolbar, filters, footer and selection state; without it only the table renders. */
+  controls?: TableControls;
 };
 
 const NO_ENTRIES: RowEntry<never>[] = [];
@@ -115,10 +121,21 @@ function useTableVirtualization<R>(props: ViewProps<R>) {
   return { scrollRef, enabled, range, maxHeight };
 }
 
+/** The select-all box and the row checkboxes, when the table is selectable and has selection state. */
+function selectionControls<R>({ controls, selectable, labels }: ViewProps<R>) {
+  if (!selectable || !controls) return { selectAll: undefined, rowSelection: undefined };
+  const { allSelected, indeterminate, toggleAll, isSelected, toggleRow } = controls.selection;
+  return {
+    selectAll: { checked: allSelected, indeterminate, onToggle: toggleAll, label: labels.selectAll },
+    rowSelection: { isSelected, toggleRow, label: labels.selectRow },
+  };
+}
+
 /** The scroll container and the table: fixed layout, sticky header, rows virtualized when on. */
 function TableScroll<R>(props: ViewProps<R>) {
   const { columns, entries, labels, selectable = false, loading = false, emptyMessage = 'No records found' } = props;
   const { scrollRef, enabled, range, maxHeight } = useTableVirtualization(props);
+  const { selectAll, rowSelection } = selectionControls(props);
   // Collapsed borders: no border-spacing between rows, so rows sit exactly at their measured offsets.
   const tableStyle = { tableLayout: 'fixed', borderCollapse: 'collapse', width: '100%', minWidth: tableMinWidth(columns, selectable) } as const;
   // A stable gutter keeps the vertical scrollbar from taking width from the columns when it appears.
@@ -138,7 +155,7 @@ function TableScroll<R>(props: ViewProps<R>) {
       <table className="btt-table" style={tableStyle} aria-busy={loading} aria-rowcount={entries.length + 1}>
         {props.caption !== undefined && <caption className="btt-caption">{props.caption}</caption>}
         <ColGroup columns={columns} selectable={selectable} />
-        <TableHead columns={columns} sort={props.sort} onSort={props.onSort} selectable={selectable} />
+        <TableHead columns={columns} sort={props.sort} onSort={props.onSort} selectable={selectable} selectAll={selectAll} />
         <ErrorBoundary fallback={bodyFallback} onError={props.onError} resetKey={entries}>
           <TableBody
             entries={entries}
@@ -147,6 +164,7 @@ function TableScroll<R>(props: ViewProps<R>) {
             loading={loading}
             emptyMessage={emptyMessage}
             range={range}
+            selection={rowSelection}
             rowClassName={props.rowClassName}
             rowProps={props.rowProps}
           />
@@ -157,21 +175,37 @@ function TableScroll<R>(props: ViewProps<R>) {
 }
 
 function TableView<R>(props: ViewProps<R>) {
+  const { controls } = props;
   const loading = props.loading ?? false;
   return (
     <>
+      {controls && <TopControls {...props} controls={controls} />}
       <div className={cx('btt-status', loading && 'btt-status--loading')} style={STATUS_STYLE} role="status" aria-live="polite">
         {loading ? props.labels.loading : null}
       </div>
       <TableScroll {...props} />
+      {controls && <FooterControls {...props} controls={controls} />}
     </>
   );
+}
+
+/** Controls of client mode: the counter over the filtered rows, and every filtered row for export. */
+function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): TableControls {
+  const counter = getCounter({
+    page: table.page,
+    pageSize: props.pagination === false ? 0 : table.pageSize,
+    total: table.filteredRows.length,
+    unfilteredTotal: table.totalRows,
+  });
+  const exportData = () => buildExportData(props.columns, table.filteredRows.map((entry) => entry.row));
+  return { ...table, counter, exportData };
 }
 
 function ClientTable<R>(props: ContentProps<R> & { rows: readonly R[] }) {
   const table = useClientTable(props);
   useInvalidRowWarning(props.rows, table.totalRows);
-  return <TableView {...props} entries={table.pageRows} sort={table.sort} onSort={table.toggleSort} />;
+  const controls = clientControls(table, props);
+  return <TableView {...props} entries={table.pageRows} sort={table.sort} onSort={table.toggleSort} controls={controls} />;
 }
 
 /** Validates the mode, then renders client mode, or the empty shell for `fetchRows` (server mode). */
