@@ -28,6 +28,12 @@ describe('formatCounter', () => {
     expect(formatCounter(null, DEFAULT_LABELS)).toBe('No records');
   });
 
+  it('groups digits for the given locale', () => {
+    expect(formatCounter({ from: 1, to: 100, total: 2345, filteredFrom: 50000 }, DEFAULT_LABELS, 'de-DE')).toBe(
+      'Showing 1–100 of 2.345 (filtered from 50.000)',
+    );
+  });
+
   it('uses the label templates', () => {
     const labels = { ...DEFAULT_LABELS, counter: '{from}-{to}/{total}', counterFiltered: '[{total}]' };
     expect(formatCounter({ from: 1, to: 2, total: 2, filteredFrom: 9 }, labels)).toBe('1-2/2 [9]');
@@ -76,5 +82,11 @@ describe('Toolbar', () => {
     expect(onExport).toHaveBeenCalledWith('xlsx');
     expect(screen.getByRole('button', { name: 'PDF' })).toBeInTheDocument();
     expect(screen.getByText('Extra')).toBeInTheDocument();
+  });
+
+  it('labels the export format buttons from the exportFormat template', () => {
+    const labels = { ...DEFAULT_LABELS, exportFormat: 'Save as {format}' };
+    render(<Toolbar labels={labels} exportFormats={['pdf']} onExport={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Save as PDF' })).toBeInTheDocument();
   });
 });

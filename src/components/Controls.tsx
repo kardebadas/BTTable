@@ -32,6 +32,11 @@ export type ControlProps = {
   exportFormats?: readonly string[];
   /** Caller content placed in the toolbar. */
   toolbarExtras?: ReactNode;
+  /**
+   * Locale of the counter and page-count numbers (e.g. `'en-US'`). Default: the runtime's;
+   * pass a fixed one when server rendering, so the server and the browser agree.
+   */
+  locale?: string;
 };
 
 /** State and actions the controls read, whatever the data mode. */
@@ -109,6 +114,7 @@ export function TopControls<R>(props: ControlsInput<R>) {
       </ErrorBoundary>
       <Toolbar
         labels={labels}
+        locale={props.locale}
         search={props.search === false ? undefined : search}
         counter={props.showCounter === false ? undefined : controls.counter}
         exportFormats={props.exportFormats}
@@ -120,13 +126,14 @@ export function TopControls<R>(props: ControlsInput<R>) {
 }
 
 /** The pagination footer below the table, behind an error boundary; nothing when `pagination` is `false`. */
-export function FooterControls<R>({ controls, labels, pagination, pageSizeOptions, onError }: ControlsInput<R>) {
+export function FooterControls<R>({ controls, labels, locale, pagination, pageSizeOptions, onError }: ControlsInput<R>) {
   if (pagination === false) return null;
   const fallback = <div className="btt-error" role="alert">{labels.error}</div>;
   return (
     <ErrorBoundary fallback={fallback} onError={onError} resetKey={labels}>
       <Pagination
         labels={labels}
+        locale={locale}
         page={controls.page}
         pageCount={controls.pageCount}
         pageSize={controls.pageSize}

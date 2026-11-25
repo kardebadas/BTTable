@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BTTable, type BTTableProps } from './BTTable';
+import { BTTable } from './BTTable';
+import type { BTTableClientProps } from './BTTableProps';
 import { tableMinWidth, toCssSize } from './components/ColGroup';
 import type { Column, FetchRows } from './core/types';
 
@@ -18,7 +19,7 @@ const COLUMNS: Column<Row>[] = [
   { key: 'note', header: <em>Note</em>, headerText: 'Note', sortable: false },
 ];
 
-function setup(props: Partial<BTTableProps<Row>> = {}) {
+function setup(props: Partial<BTTableClientProps<Row>> = {}) {
   return render(<BTTable columns={COLUMNS} rows={ROWS} {...props} />);
 }
 
@@ -37,6 +38,7 @@ describe('mode validation', () => {
     silenceErrors();
     const onError = vi.fn();
     const fetchRows = vi.fn() as unknown as FetchRows<Row>;
+    // @ts-expect-error -- both sources are a type error; the runtime check is tested here.
     const { container } = setup({ fetchRows, onError });
     expect(container.querySelector('.btt-error')).toHaveAttribute('role', 'alert');
     expect(container.querySelector('table')).toBeNull();
@@ -46,6 +48,7 @@ describe('mode validation', () => {
   it('renders the error state when neither is passed', () => {
     silenceErrors();
     const onError = vi.fn();
+    // @ts-expect-error -- no source is a type error; the runtime check is tested here.
     const { container } = render(<BTTable columns={COLUMNS} onError={onError} />);
     expect(container.querySelector('.btt-error')).toBeInTheDocument();
     expect(onError.mock.calls[0][0].message).toMatch(/neither/);
@@ -121,7 +124,7 @@ describe('layout', () => {
   });
 
   it('accepts maxHeight as a number, a CSS string or none', () => {
-    const scroll = (props: Partial<BTTableProps<Row>>) =>
+    const scroll = (props: Partial<BTTableClientProps<Row>>) =>
       (setup(props).container.querySelector('.btt-scroll') as HTMLElement).style.maxHeight;
     expect(scroll({ maxHeight: 300 })).toBe('300px');
     expect(scroll({ maxHeight: '50vh' })).toBe('50vh');
@@ -249,6 +252,23 @@ describe('rows and cells', () => {
     expect(td).toHaveTextContent('Nothing here');
     expect(td.colSpan).toBe(3);
   });
+
+  it('gives the empty row its own class, never the data-row class', () => {
+    const { container } = setup({ rows: [] });
+    expect(container.querySelectorAll('tbody tr.btt-row')).toHaveLength(0);
+    expect(container.querySelector('tbody tr')).toHaveClass('btt-empty-row');
+  });
+
+  it('warns once per rows change, in development, about duplicate row ids', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rows = [ROWS[0], { ...ROWS[1], id: 1 }, { ...ROWS[2], id: 1 }];
+    const { rerender } = setup({ rows });
+    rerender(<BTTable columns={COLUMNS} rows={rows} loading />);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/2 row\(s\) repeat the id of an earlier row/);
+    rerender(<BTTable columns={COLUMNS} rows={ROWS} />);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('loading', () => {
@@ -317,6 +337,7 @@ describe('errors and labels', () => {
 
   it('recovers from a missing source once rows arrive', () => {
     silenceErrors();
+    // @ts-expect-error -- a missing source is a type error; the runtime check is tested here.
     const { container, rerender } = render(<BTTable columns={COLUMNS} rows={undefined} />);
     expect(container.querySelector('.btt-error')).toBeInTheDocument();
     rerender(<BTTable columns={COLUMNS} rows={ROWS} />);

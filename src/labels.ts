@@ -23,6 +23,8 @@ export type BTTableLabels = {
   noRecords: string;
   /** Text of the CSV export button. */
   exportCsv: string;
+  /** Text of each `exportFormats` button; `{format}` is the format name in upper case. */
+  exportFormat: string;
   /** Accessible name of the pagination `<nav>`. */
   pagination: string;
   previousPage: string;
@@ -55,8 +57,8 @@ export type BTTableLabels = {
   noOptions: string;
 };
 
-/** The default English labels. */
-export const DEFAULT_LABELS: BTTableLabels = {
+/** The default English labels (frozen: spread them to build your own). */
+export const DEFAULT_LABELS: Readonly<BTTableLabels> = Object.freeze({
   loading: 'Loading…',
   error: 'Something went wrong.',
   loadError: 'Could not load the rows.',
@@ -67,6 +69,7 @@ export const DEFAULT_LABELS: BTTableLabels = {
   counterFiltered: '(filtered from {total})',
   noRecords: 'No records',
   exportCsv: 'CSV',
+  exportFormat: '{format}',
   pagination: 'Pagination',
   previousPage: 'Previous',
   nextPage: 'Next',
@@ -83,13 +86,21 @@ export const DEFAULT_LABELS: BTTableLabels = {
   multiSelected: '{count} selected',
   searchOptions: 'Search options',
   noOptions: 'No options',
-};
+});
 
-const COUNT_FORMAT = new Intl.NumberFormat();
+const COUNT_FORMATS = new Map<string | undefined, Intl.NumberFormat>();
 
-/** A count with the runtime locale's digit grouping, e.g. `2,345`. */
-export function formatCount(count: number): string {
-  return COUNT_FORMAT.format(count);
+/**
+ * A count with the digit grouping of `locale` (default: the runtime's), e.g. `2,345`.
+ * One formatter per locale is created and kept.
+ */
+export function formatCount(count: number, locale?: string): string {
+  let format = COUNT_FORMATS.get(locale);
+  if (!format) {
+    format = new Intl.NumberFormat(locale);
+    COUNT_FORMATS.set(locale, format);
+  }
+  return format.format(count);
 }
 
 /** Replaces each `{name}` in `template` with `values[name]`; unknown names stay as written. */

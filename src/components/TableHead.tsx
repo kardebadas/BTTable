@@ -1,6 +1,7 @@
-import { type ChangeEvent, type CSSProperties, useLayoutEffect, useRef } from 'react';
+import { type ChangeEvent, type CSSProperties, useRef } from 'react';
 import { headerText } from '../core/export';
 import type { Column, SortState } from '../core/types';
+import { useBrowserLayoutEffect } from '../hooks/useBrowserLayoutEffect';
 import { alignClass, cx } from './classNames';
 
 const STICKY: CSSProperties = { position: 'sticky', top: 0, zIndex: 1 };
@@ -58,7 +59,7 @@ export type SelectAllState = { checked: boolean; indeterminate: boolean; onToggl
  */
 function SelectAllBox({ checked, indeterminate, onToggle, label }: SelectAllState) {
   const ref = useRef<HTMLInputElement>(null);
-  useLayoutEffect(() => {
+  useBrowserLayoutEffect(() => {
     if (ref.current) ref.current.indeterminate = indeterminate;
   });
   const change = (event: ChangeEvent<HTMLInputElement>) => {

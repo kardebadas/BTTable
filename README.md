@@ -49,7 +49,9 @@ import '@kardebadas/bttable/styles.css';
 ## Quick start
 
 Pass exactly one of `rows` (client mode) or `fetchRows` (server mode). Passing both or
-neither is an error: the table renders its error fallback and calls `onError`.
+neither is a TypeScript error (`BTTableProps` is a union of `BTTableClientProps` and
+`BTTableServerProps`), and at runtime the table renders its error fallback and calls
+`onError`.
 
 ### Client mode
 
@@ -148,21 +150,24 @@ return a component from `render` (`render: ({ row }) => <StatusCell row={row} />
 
 ## Rows and ids
 
-- `rows?: readonly R[]` — client mode data. Entries that are `null` or not objects are
-  skipped, with a warning in development.
+- `rows: readonly R[]` — client mode data. Entries that are `null` or not objects are
+  skipped, with a warning in development (server mode warns the same way for each response).
 - `getRowId?: (row, index) => string | number` — the default is the first string or number
   among `row.id`, `row.ID`, `row.INDEX`, `row.N_ID`, else the row's index in `rows`. Ids are
   React keys, height-cache keys and selection ids. **Selection needs stable ids**: an index
   changes when rows are reordered or replaced, and in server mode it is the position on the
   page, so it collides across pages. Server rows need real ids (development warning when a
-  selectable server table has rows without one and no `getRowId`).
+  selectable server table has rows without one and no `getRowId`). Ids must be unique:
+  in development the table warns once per `rows` array (or server response) when some rows
+  repeat an earlier row's id.
 - `rowClassName?: (row, index) => string | undefined` — extra class for a body row.
 - `rowProps?: (row, index) => attributes` — any `<tr>` attributes, including `onClick`,
   `data-*` and `className` (merged with the table's classes). `index` is the row's index in
   `rows` (server mode: on the page).
 
 Every body row has the class `btt-row` plus `btt-row--odd` or `btt-row--even` by its
-position in the displayed list (the first row is odd).
+position in the displayed list (the first row is odd). The row that shows the empty message
+or the load error has the class `btt-empty-row` instead.
 
 ## Table props
 
@@ -173,7 +178,7 @@ position in the displayed list (the first row is odd).
 | Prop | Default | Meaning |
 | --- | --- | --- |
 | `columns` | required | Column definitions. Keep the array stable (module-level or `useMemo`). |
-| `rows` | – | Client mode data. Keep the array stable: a new array is new data and scrolls the table back to the top. |
+| `rows` | – | Client mode data. Keep the array stable: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
 | `fetchRows` | – | Server mode data source; see [Server mode](#server-mode). A new function identity does not refetch. |
 | `getRowId` | `id`/`ID`/`INDEX`/`N_ID`, else index | Row id; see [Rows and ids](#rows-and-ids). |
 | `rowClassName` | – | `(row, index) => class`. Keep it stable. |
@@ -199,7 +204,7 @@ position in the displayed list (the first row is odd).
 | --- | --- | --- |
 | `exportCsv` | `false` | Show a CSV button. |
 | `exportFileName` | `'table.csv'` | File name of the CSV download. |
-| `exportFormats` | `[]` | Extra format names (e.g. `['pdf', 'xlsx']`): one button each, labelled in upper case, shown only with `onExport`. |
+| `exportFormats` | `[]` | Extra format names (e.g. `['pdf', 'xlsx']`): one button each, shown only with `onExport`, labelled by the `exportFormat` label (default: the name in upper case). |
 | `onExport` | – | `(format, data) => void`, called by the `exportFormats` buttons; see [Export](#export). |
 
 ### Selection
@@ -224,6 +229,7 @@ position in the displayed list (the first row is odd).
 | `caption` | – | Visually hidden `<caption>` naming the table for assistive technology. |
 | `className` | – | Extra class on the root `.btt` element. |
 | `labels` | English | Partial override of every UI string; see [Labels](#labels-i18n). |
+| `locale` | runtime locale | Locale of the counter and page-count numbers (e.g. `'en-US'`). Pass a fixed one when server rendering; see [Server-side rendering](#server-side-rendering). |
 | `onError` | – | `(error, info) => void` when a render error is caught by the table's error boundary. |
 
 ### Callbacks per mode
@@ -245,7 +251,7 @@ table. Widgets are native inputs, except `multiselect`, which is a package-owned
 | `number` | number input, two for `range` | `number`, or `[min, max]` (each `number \| null`) for `range` | `op`: `'eq'` (default), `'gt'`, `'gte'`, `'lt'`, `'lte'`, `'range'`; `defaultValue` |
 | `date` | date input, two for `range` | ISO day `'yyyy-mm-dd'`, or `[from, to]` (each `string \| null`) for `range` | `op`: `'on'` (default), `'before'`, `'after'`, `'range'`; `defaultValue` |
 | `select` | `<select>` with an "All" choice | option `value` (`string`) | `options` (required); `defaultValue` |
-| `multiselect` | dropdown of checkboxes with a search box | `string[]` of option values | `options` (required); `defaultValue` |
+| `multiselect` | button showing the choice as chips, opening checkboxes with a search box | `string[]` of option values | `options` (required); `defaultValue` |
 | `notEmpty` | checkbox "Only non-empty" | `boolean` | – |
 
 ```ts
@@ -309,7 +315,8 @@ Example query:
   "filters": {
     "age": { "type": "number", "op": "range", "value": [18, null] },
     "joined": { "type": "date", "op": "after", "value": "2024-01-31" },
-    "role": { "type": "select", "value": "admin" }
+    "role": { "type": "select", "value": "admin" },
+    "name": { "type": "text", "op": "contains", "value": "smi" }
   }
 }
 ```
@@ -317,8 +324,8 @@ Example query:
 - `filters` holds only **active** filters, keyed by column key, with typed values: text
   trimmed, numbers as numbers, dates as ISO `yyyy-mm-dd` days, `select` a string,
   `multiselect` a string array, `notEmpty` `true`.
-- `op` is present only when the column's `FilterSpec` sets one; when it is absent, apply the
-  same default as client mode (`contains`, `eq`, `on`).
+- `op` is always present for `text`, `number` and `date` filters: the column's `op`, else
+  the default (`contains`, `eq`, `on`). `select`, `multiselect` and `notEmpty` have none.
 - `totalRows` is the unfiltered count; `totalFilteredRows` (default `totalRows`) is the count
   after search and filters and drives the counter and the page count.
 
@@ -334,14 +341,20 @@ Behaviour:
   the status strip reads "Loading…".
 - **Errors.** When `fetchRows` rejects (or resolves without a `rows` array) the body shows
   "Could not load the rows." with a **Retry** button that sends the same query again. Rows
-  and counter stay cleared until a request succeeds.
+  and counter stay cleared until a request succeeds: while a retry (or any new query after
+  the failure) is loading, the body is empty and the status strip reads "Loading…"; the rows
+  of the last success never show under the new query. Returning to the query whose rows were
+  last on screen shows them again without a request.
 - **Page clamping.** If a response reports fewer pages than the current page, the table moves
   to the last page and fetches it.
 - **Missing totals.** Without a valid total the counter counts the rows up to this page, and
   a full page offers one more page after it.
 - **Refresh and reset.** A new `fetchRows` identity does not refetch; change `refreshKey` to
   send the current query again (for example after an edit, or when the fetcher captures a new
-  tenant id). `resetKey` clears search and filters, goes to page 1 and sends one request.
+  tenant id); the scroll position is kept. `resetKey` clears search and filters, goes to
+  page 1 and sends one request.
+- **Invalid rows.** Entries of `rows` that are `null` or not objects are skipped, with one
+  development warning per response.
 - **Pagination is always on.** `pagination={false}` is ignored (development warning).
 - **Export covers the current page only**, and select-all selects the current page; see
   [Export](#export) and [Selection](#selection).
@@ -357,7 +370,7 @@ shows an indeterminate state for a partial selection, and toggles:
 
 Use `selectedIds` + `onSelectionChange` for controlled selection, or `defaultSelectedIds` for
 uncontrolled. In client mode a selected id whose row disappears from `rows` is dropped from
-the selection. In server mode ids on other pages are never pruned (those rows are not
+the selection (not when `rows` becomes empty). In server mode ids on other pages are never pruned (those rows are not
 loaded), so clear stale ids yourself through a controlled `selectedIds`.
 
 ## Export
@@ -398,13 +411,17 @@ carry a time of day), everything else becomes its display text, never a React no
 - Virtualization mounts the visible rows plus 8 on each side, between two spacer rows. Row
   heights are measured as rows mount (and on resize, through one `ResizeObserver`) and cached
   by row id, so rows of very different heights scroll smoothly and the view stays anchored
-  when rows above it change height. When the displayed list changes (data, page, sort,
-  search or filters), the scroll returns to the top.
+  when rows above it change height.
+- The scroll returns to the top only when the **view** changes: page, page size, sort, the
+  applied search, filters, or `resetKey`. New data for the same view keeps the reader's
+  place: a new `rows` array (polling), new `columns` or `getRowId`, and in server mode a
+  `refreshKey` refetch, a Retry or any answer to the same query. In server mode the reset
+  happens when the response for the new view arrives.
 
 **Keep these props stable** (module-level constants, `useMemo` or `useCallback`):
 `columns`, `rows`, `getRowId`, `rowClassName`, `rowProps`. Rows are memoized on their
 identity: a new `columns` array or callback re-renders every row, and a new `rows` array or
-`getRowId` re-derives the list and scrolls the table back to the top on every parent render.
+`getRowId` re-filters, re-sorts and re-derives the whole list on every parent render.
 
 ```tsx
 const columns = useMemo(() => buildColumns(t), [t]);
@@ -414,7 +431,8 @@ const rowProps = useCallback((row: Person) => ({ onClick: () => open(row.id) }),
 ## Labels (i18n)
 
 Every UI string can be replaced through `labels` (a partial object). `{name}` placeholders
-are filled in by the table; counts are formatted with the runtime locale.
+are filled in by the table; counts are formatted with the `locale` prop (default: the
+runtime locale). `DEFAULT_LABELS` (exported, frozen) holds the English defaults.
 
 | Key | Default |
 | --- | --- |
@@ -428,6 +446,7 @@ are filled in by the table; counts are formatted with the runtime locale.
 | `counterFiltered` | `(filtered from {total})` |
 | `noRecords` | `No records` |
 | `exportCsv` | `CSV` |
+| `exportFormat` | `{format}` (the `exportFormats` name in upper case) |
 | `pagination` | `Pagination` |
 | `previousPage` | `Previous` |
 | `nextPage` | `Next` |
@@ -469,7 +488,7 @@ plain rule wins:
 | `--btt-fg` | `#1d2733` | Text. |
 | `--btt-surface` | `#f5f8fb` | Filters panel and buttons. |
 | `--btt-border` | `#d8e0e8` | Grid lines and panel borders. |
-| `--btt-border-strong` | `#aebbc8` | Input and button borders. |
+| `--btt-border-strong` | `#7d8d9c` | Input and button borders (at least 3:1 against the background; dark `#5f6e7d`). |
 | `--btt-header-bg` | `#064b8f` | Header background. |
 | `--btt-header-fg` | `#ffffff` | Header text and its focus ring. |
 | `--btt-row-alt` | `#eef5fc` | Even (alternate) rows. |
@@ -483,6 +502,10 @@ plain rule wins:
 one scheme regardless of the system, add `btt-theme-light` or `btt-theme-dark` to
 `className`. Animations (the loading spinner, hover fades) run only when the user has not
 asked for reduced motion.
+
+Row striping, hover, the selected-row tint and the cell grid lines have zero specificity
+(`:where()`), so a `rowClassName` or `cellClassName` style of yours wins over them without
+`!important`.
 
 Do not give `th`/`td` widths of your own: column widths come from `columns` only.
 
@@ -498,7 +521,10 @@ Do not give `th`/`td` widths of your own: column widths come from `columns` only
 - Pagination is a `<nav aria-label="Pagination">` with real buttons, a labelled page box
   (Enter or blur commits, clamped into range) and a labelled page-size select.
 - Every filter has a `<label>` bound to its control. The multi-select is a button
-  (`aria-haspopup="listbox"`) opening a search box and a `listbox`: ArrowDown opens it and
+  (`aria-haspopup="listbox"`) showing up to two chosen labels as chips and a "+N" chip for
+  the rest; it is named by its label plus a summary ("All", the one label, or "3
+  selected"), and the chips are hidden from assistive technology. It opens a search box and
+  a `listbox`: ArrowDown on the button opens it and focuses the search box, ArrowDown there
   enters the list, arrows move, Space or Enter toggles, Escape closes and returns focus, a
   click outside closes it.
 - `caption` adds a visually hidden table caption.
@@ -506,7 +532,10 @@ Do not give `th`/`td` widths of your own: column widths come from `columns` only
 
 ## Server-side rendering
 
-The table renders on the server without `document` or `ResizeObserver`. A virtualized table
+The table renders on the server without `document` or `ResizeObserver`, and without
+layout-effect warnings. Numbers in the counter use the runtime locale unless you pass
+`locale`: pass a fixed one (e.g. `locale="en-US"`) so the server and the browser render the
+same text and hydration does not mismatch. A virtualized table
 renders its first rows and a spacer for the rest, sized with `estimatedRowHeight`; real
 heights are measured after hydration. Downloads touch `document` only when a button is
 clicked. In server mode the first request is sent from an effect, so the server output has
@@ -522,10 +551,12 @@ error tints (without them, no tint).
 
 ## Other exports
 
-Besides `BTTable` and its types (`BTTableProps`, `Column`, `CellContext`, `FilterSpec`,
+Besides `BTTable` and its types (`BTTableProps`, `BTTableClientProps`, `BTTableServerProps`,
+`BTTableCommonProps`, `Column`, `CellContext`, `FilterSpec`,
 `FilterState`, `FilterValue`, `Option`, `TextOp`, `NumberOp`, `DateOp`, `SortState`, `Query`,
 `FetchResult`, `FetchRows`, `ExportData`, `RowId`, `RowAttributes`, `ClientTableState`,
-`BTTableLabels`), the package exports the helpers it uses itself:
+`BTTableLabels`, `VirtualizeMode`), the package exports `DEFAULT_LABELS` and the helpers it
+uses itself:
 
 - `compareValues(a, b, direction?)` — the sort comparator.
 - `parseDate(value)` — `Date`, ISO or US date string → `Date | null`, with calendar
@@ -543,6 +574,9 @@ npm test               # unit tests (Vitest + Testing Library)
 npm run test:coverage  # with coverage (80 % line threshold)
 npm run check          # typecheck, lint, test, build
 ```
+
+The stylesheet source is split into `src/styles/theme.css`, `table.css` and `controls.css`;
+the build concatenates them, in that order, into the one published `dist/styles.css`.
 
 The demo (`demo/`) is not part of the published package. Its client tab renders 5,000
 generated rows of very different heights with every filter type, selection and exports, and

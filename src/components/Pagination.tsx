@@ -5,6 +5,8 @@ import { type BTTableLabels, fillLabel, formatCount } from '../labels';
 /** Props of `Pagination`. Pages are 1-based. */
 export type PaginationProps = {
   labels: BTTableLabels;
+  /** Locale of the page count; default: the runtime's. */
+  locale?: string;
   page: number;
   pageCount: number;
   pageSize: number;
@@ -13,10 +15,10 @@ export type PaginationProps = {
   onPageSizeChange: (pageSize: number) => void;
 };
 
-type PageInputProps = Pick<PaginationProps, 'labels' | 'page' | 'pageCount' | 'onPageChange'>;
+type PageInputProps = Pick<PaginationProps, 'labels' | 'locale' | 'page' | 'pageCount' | 'onPageChange'>;
 
 /** Page number box: edits stay local until Enter or blur, then commit clamped into range. */
-function PageInput({ labels, page, pageCount, onPageChange }: PageInputProps) {
+function PageInput({ labels, locale, page, pageCount, onPageChange }: PageInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
     setDraft(null);
@@ -44,7 +46,7 @@ function PageInput({ labels, page, pageCount, onPageChange }: PageInputProps) {
         onBlur={commit}
         onKeyDown={onKeyDown}
       />
-      <span className="btt-page-count">{fillLabel(labels.pageOf, { count: formatCount(pageCount) })}</span>
+      <span className="btt-page-count">{fillLabel(labels.pageOf, { count: formatCount(pageCount, locale) })}</span>
     </span>
   );
 }

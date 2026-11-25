@@ -117,7 +117,7 @@ export function TableBody<R>(props: TableBodyProps<R>) {
     return (
       <tbody>
         {!loading && (
-          <tr className="btt-row btt-row--empty">
+          <tr className="btt-empty-row">
             <td className="btt-empty" colSpan={colSpan}>
               {emptyMessage}
             </td>

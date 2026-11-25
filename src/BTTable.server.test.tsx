@@ -66,10 +66,10 @@ describe('scheduling', () => {
     advance(99);
     expect(calls).toHaveLength(1);
     advance(1);
-    expect(calls[1].query.filters).toEqual({ name: { type: 'text', value: 'an' } });
+    expect(calls[1].query.filters).toEqual({ name: { type: 'text', op: 'contains', value: 'an' } });
     fireEvent.change(screen.getByLabelText('State'), { target: { value: 'tx' } });
     expect(calls).toHaveLength(3);
-    expect(calls[2].query.filters).toEqual({ name: { type: 'text', value: 'an' }, state: { type: 'select', value: 'tx' } });
+    expect(calls[2].query.filters).toEqual({ name: { type: 'text', op: 'contains', value: 'an' }, state: { type: 'select', value: 'tx' } });
   });
 
   it('sends sort and page size changes at once and aborts the request in flight', () => {
@@ -132,7 +132,7 @@ describe('returning to a query', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'x' } });
     advance(250);
     expect(calls).toHaveLength(3);
-    expect(calls[2].query).toMatchObject({ search: 'ab', filters: { name: { type: 'text', value: 'x' } } });
+    expect(calls[2].query).toMatchObject({ search: 'ab', filters: { name: { type: 'text', op: 'contains', value: 'x' } } });
     fireEvent.change(box, { target: { value: 'ab ' } });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: ' x ' } });
     advance(1000);
@@ -200,9 +200,44 @@ describe('responses', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Again' }));
     expect(calls).toHaveLength(3);
     expect(calls[2].query).toEqual(calls[1].query);
+    // Until the retry settles: no rows of the last success, no counter, just loading.
+    expect(names(container)).toEqual([]);
+    expect(screen.queryByText(/Showing/)).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading…');
     await settle(calls[2], { rows: makeRows(3, 2), totalRows: 4 });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(names(container)).toEqual(['Row 3', 'Row 4']);
+  });
+
+  it('keeps the rows of the last success hidden while a new query after a failure loads', async () => {
+    const { container, calls } = renderServer({ pageSize: 2 });
+    await settle(calls[0], { rows: makeRows(1, 2), totalRows: 4 });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await settle(calls[1], { error: new Error('boom') });
+    fireEvent.click(screen.getByRole('button', { name: 'State' }));
+    expect(calls).toHaveLength(3);
+    expect(names(container)).toEqual([]);
+    expect(screen.queryByRole('alert')).toBeNull();
+    await settle(calls[2], { rows: makeRows(7, 1), totalRows: 4 });
+    expect(names(container)).toEqual(['Row 7']);
+  });
+
+  it('skips invalid rows of a response with one dev warning per response', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { container, calls } = renderServer();
+    await settle(calls[0], { rows: [null, ...makeRows(1, 1), 'x'] as never, totalRows: 3 });
+    expect(names(container)).toEqual(['Row 1']);
+    fireEvent.click(screen.getByRole('button', { name: 'Name' }));
+    expect(warn.mock.calls.filter(([message]) => /invalid rows/.test(message))).toHaveLength(1);
+    expect(warn.mock.calls[0][0]).toMatch(/skipped 2 invalid rows/);
+  });
+
+  it('warns in development about duplicate ids in a response', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { calls } = renderServer();
+    await settle(calls[0], { rows: [...makeRows(1, 2), ...makeRows(1, 1)], totalRows: 3 });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/1 row\(s\) repeat the id of an earlier row/);
   });
 
   it('treats a malformed result as an error', async () => {

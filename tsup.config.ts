@@ -1,5 +1,8 @@
-import { copyFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { defineConfig } from 'tsup';
+
+/** The stylesheet parts, concatenated in this order into the one published dist/styles.css. */
+const STYLE_PARTS = ['theme', 'table', 'controls'];
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -9,6 +12,7 @@ export default defineConfig({
   sourcemap: true,
   external: ['react', 'react-dom', 'react/jsx-runtime'],
   async onSuccess() {
-    await copyFile('src/styles.css', 'dist/styles.css');
+    const parts = await Promise.all(STYLE_PARTS.map((name) => readFile(`src/styles/${name}.css`, 'utf8')));
+    await writeFile('dist/styles.css', parts.join('\n'));
   },
 });

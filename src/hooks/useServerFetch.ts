@@ -8,6 +8,8 @@ export type ServerFetchInput<R> = {
   query: Query;
   /** Identity of `query`; a change asks for a new request. */
   queryKey: string;
+  /** Identity of the view the query shows (query plus resets); reported back with its result. */
+  viewKey: string;
   /** Identity of the typed-in part of `query`; a change there waits `delay` ms of quiet. */
   typedKey: string;
   /** Bumped by refresh, reset and retry: a change sends the same query again, at once. */
@@ -18,15 +20,26 @@ export type ServerFetchInput<R> = {
   onResult?: (query: Query, result: FetchResult<R>) => void;
 };
 
-/** The request state: the last accepted result, whether a request is pending, and whether it failed. */
-export type ServerFetch<R> = { result: FetchResult<R> | null; loading: boolean; error: boolean };
+/**
+ * The request state: the last accepted result, the view key it was requested for, whether a
+ * request is pending, and whether it failed.
+ */
+export type ServerFetch<R> = { result: FetchResult<R> | null; viewKey: string; loading: boolean; error: boolean };
 
 /**
  * Request state. `requestKey` is the request the current props ask for; `pending` is true
  * while it is outstanding (scheduled or in flight); `successKey` names the request whose
  * `result` is on screen.
  */
-type FetchState<R> = { requestKey: string; pending: boolean; successKey: string; result: FetchResult<R> | null; error: boolean };
+type FetchState<R> = {
+  requestKey: string;
+  pending: boolean;
+  successKey: string;
+  result: FetchResult<R> | null;
+  /** The view key of the request whose `result` is on screen. */
+  resultViewKey: string;
+  error: boolean;
+};
 
 type SetFetchState<R> = Dispatch<SetStateAction<FetchState<R>>>;
 
@@ -64,7 +77,7 @@ function sendRequest<R>({ input, requestKey, signal, setState }: SendInput<R>): 
     .then(
       (result) => {
         if (signal.aborted) return;
-        settle(setState, requestKey, { result, successKey: requestKey, error: false });
+        settle(setState, requestKey, { result, successKey: requestKey, resultViewKey: input.viewKey, error: false });
         input.onResult?.(query, result);
       },
       (error: unknown) => {
@@ -82,12 +95,15 @@ function isTyping(last: Scheduled | null, next: Scheduled): boolean {
 
 /**
  * The request state for `requestKey`, adjusted during render when the key changes: a key
- * whose result is already on screen needs no request; any other key is pending.
+ * whose result is already on screen needs no request; any other key is pending. A failure
+ * stays until a request settles (or the key of the result on screen comes back), so a retry
+ * never shows the last success's rows under the new query.
  */
 function useFetchState<R>(requestKey: string) {
-  const [state, setState] = useState<FetchState<R>>(() => ({ requestKey, pending: true, successKey: '', result: null, error: false }));
+  const [state, setState] = useState<FetchState<R>>(() => ({ requestKey, pending: true, successKey: '', result: null, resultViewKey: '', error: false }));
   if (state.requestKey === requestKey) return { state, setState };
-  const next = { ...state, requestKey, pending: requestKey !== state.successKey, error: false };
+  const onScreen = requestKey === state.successKey;
+  const next = { ...state, requestKey, pending: !onScreen, error: onScreen ? false : state.error };
   setState(next);
   return { state: next, setState };
 }
@@ -120,5 +136,5 @@ export function useServerFetch<R>(input: ServerFetchInput<R>): ServerFetch<R> {
       controller.abort();
     };
   }, [requestKey, typedKey, generation, latest, pending, setState]);
-  return { result: state.result, loading: state.pending, error: state.error };
+  return { result: state.result, viewKey: state.resultViewKey, loading: state.pending, error: state.error };
 }

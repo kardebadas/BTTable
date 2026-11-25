@@ -1,6 +1,7 @@
 import { act, render } from '@testing-library/react';
 import { vi } from 'vitest';
-import { BTTable, type BTTableProps } from '../BTTable';
+import { BTTable } from '../BTTable';
+import type { BTTableServerProps } from '../BTTableProps';
 import type { Column, FetchResult, Query } from '../core/types';
 
 /** Test row of the server-mode suites. */
@@ -53,17 +54,17 @@ export function advance(ms: number): void {
 }
 
 /** Renders a server-mode table on a deferred fetcher. */
-export function renderServer(props: Partial<BTTableProps<Row>> = {}) {
+export function renderServer(props: Partial<BTTableServerProps<Row>> = {}) {
   const server = deferredServer();
   const view = render(<BTTable columns={COLUMNS} fetchRows={server.fetchRows} {...props} />);
-  const rerender = (next: Partial<BTTableProps<Row>>) =>
+  const rerender = (next: Partial<BTTableServerProps<Row>>) =>
     view.rerender(<BTTable columns={COLUMNS} fetchRows={server.fetchRows} {...props} {...next} />);
   return { ...view, ...server, rerender };
 }
 
 /** The text of the first data cell of every rendered row. */
 export function names(container: HTMLElement): (string | null)[] {
-  return Array.from(container.querySelectorAll('tbody tr.btt-row:not(.btt-row--empty)')).map(
+  return Array.from(container.querySelectorAll('tbody tr.btt-row')).map(
     (row) => row.querySelector('td:not(.btt-cell--select)')?.textContent ?? null,
   );
 }

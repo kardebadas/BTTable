@@ -35,11 +35,24 @@ afterEach(cleanup);
 describe('MultiSelect summary', () => {
   it('summarises no choice as All, one as its label, several as a count', () => {
     const { rerender } = render(<MultiSelect id="m" options={OPTIONS} value={[]} onChange={() => {}} labels={DEFAULT_LABELS} />);
-    expect(screen.getByRole('button')).toHaveTextContent('All');
+    expect(screen.getByRole('button')).toHaveAccessibleName('All');
     rerender(<MultiSelect id="m" options={OPTIONS} value={['hold']} onChange={() => {}} labels={DEFAULT_LABELS} />);
-    expect(screen.getByRole('button')).toHaveTextContent('On hold');
+    expect(screen.getByRole('button')).toHaveAccessibleName('On hold');
     rerender(<MultiSelect id="m" options={OPTIONS} value={['open', 'closed']} onChange={() => {}} labels={DEFAULT_LABELS} />);
-    expect(screen.getByRole('button')).toHaveTextContent('2 selected');
+    expect(screen.getByRole('button')).toHaveAccessibleName('2 selected');
+  });
+
+  it('shows up to two chosen labels as chips, then a +N chip, and All when empty', () => {
+    const chips = () => Array.from(document.querySelectorAll('.btt-chip')).map((chip) => chip.textContent);
+    const { rerender } = render(<MultiSelect id="m" options={OPTIONS} value={[]} onChange={() => {}} labels={DEFAULT_LABELS} />);
+    expect(chips()).toEqual([]);
+    expect(document.querySelector('.btt-multiselect-summary')).toHaveTextContent('All');
+    rerender(<MultiSelect id="m" options={OPTIONS} value={['hold', 'gone']} onChange={() => {}} labels={DEFAULT_LABELS} />);
+    expect(chips()).toEqual(['On hold', 'gone']);
+    rerender(<MultiSelect id="m" options={OPTIONS} value={['open', 'closed', 'hold']} onChange={() => {}} labels={DEFAULT_LABELS} />);
+    expect(chips()).toEqual(['Open', 'Closed', '+1']);
+    expect(document.querySelector('.btt-multiselect-summary')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('button')).toHaveAccessibleName('3 selected');
   });
 
   it('is named by its label and its summary and announces a closed listbox popup', () => {

@@ -8,6 +8,8 @@ export type TableState = {
   sort: SortState;
   page: number;
   pageSize: number;
+  /** How many times `resetKey` has reset the view; part of the view key. */
+  resets: number;
 };
 
 /** State transitions of the client table. */
@@ -63,6 +65,6 @@ export function tableReducer(state: TableState, action: TableAction): TableState
     case 'pageSize':
       return { ...state, pageSize: Number(action.pageSize), page: 1 };
     case 'reset':
-      return { ...state, searchInput: '', search: '', filters: action.filters, page: 1 };
+      return { ...state, searchInput: '', search: '', filters: action.filters, page: 1, resets: state.resets + 1 };
   }
 }

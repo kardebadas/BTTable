@@ -1,0 +1,312 @@
+/* @kardebadas/bttable stylesheet, part 3 of 3: toolbar, filters, multi-select and pagination. */
+
+/* Shared controls */
+
+.btt-search-input,
+.btt-filter-input,
+.btt-filter-select,
+.btt-multiselect-button,
+.btt-multiselect-search,
+.btt-page-input,
+.btt-page-size select,
+.btt-export,
+.btt-retry,
+.btt-page-prev,
+.btt-page-next {
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--btt-fg);
+  background-color: var(--btt-bg);
+  border: 1px solid var(--btt-border-strong);
+  border-radius: var(--btt-radius);
+}
+
+.btt-export,
+.btt-retry,
+.btt-page-prev,
+.btt-page-next {
+  padding-inline: 12px;
+  font-weight: 500;
+  background-color: var(--btt-surface);
+  cursor: pointer;
+}
+
+.btt-export:hover,
+.btt-retry:hover,
+.btt-page-prev:hover:not(:disabled),
+.btt-page-next:hover:not(:disabled),
+.btt-multiselect-button:hover {
+  border-color: var(--btt-accent);
+}
+
+.btt-page-prev:disabled,
+.btt-page-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* Toolbar */
+
+.btt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.btt-search {
+  position: relative;
+  flex: 1 1 14rem;
+  max-width: 24rem;
+}
+
+.btt-search-input {
+  width: 100%;
+  padding-right: 32px;
+}
+
+.btt-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font: inherit;
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--btt-muted);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.btt-search-clear:hover {
+  color: var(--btt-fg);
+  background-color: var(--btt-row-hover);
+}
+
+.btt-counter {
+  margin-right: auto;
+  color: var(--btt-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.btt-exports,
+.btt-toolbar-extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Filters panel (its grid template is set inline) */
+
+.btt-filters {
+  gap: 10px 12px;
+  padding: 10px 12px;
+  background-color: var(--btt-surface);
+  border: 1px solid var(--btt-border);
+  border-radius: var(--btt-radius);
+}
+
+.btt-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.btt-filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--btt-muted);
+  overflow-wrap: anywhere;
+}
+
+.btt-filter-input,
+.btt-filter-select,
+.btt-multiselect-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.btt-filter-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.btt-filter-range .btt-filter-input {
+  flex: 1 1 6.5rem;
+  width: auto;
+}
+
+.btt-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+/* Multi-select */
+
+.btt-multiselect {
+  position: relative;
+}
+
+.btt-multiselect-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.btt-multiselect-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.btt-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0 7px;
+  overflow: hidden;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-color: color-mix(in srgb, var(--btt-accent) 14%, var(--btt-bg));
+  border: 1px solid color-mix(in srgb, var(--btt-accent) 35%, var(--btt-bg));
+  border-radius: 999px;
+}
+
+.btt-chip--more {
+  flex: none;
+  color: var(--btt-muted);
+  background-color: var(--btt-surface);
+  border-color: var(--btt-border);
+}
+
+.btt-multiselect-button::after {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: -3px 2px 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.btt-multiselect-button[aria-expanded='true']::after {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.btt-multiselect-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  background-color: var(--btt-bg);
+  border: 1px solid var(--btt-border-strong);
+  border-radius: var(--btt-radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.btt-multiselect-search {
+  width: 100%;
+}
+
+.btt-multiselect-list {
+  max-height: 15rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border-radius: calc(var(--btt-radius) - 2px);
+}
+
+.btt-multiselect-list:focus-visible {
+  outline-offset: -2px;
+}
+
+.btt-multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: calc(var(--btt-radius) - 2px);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btt-multiselect-option input {
+  flex: none;
+  margin: 0;
+  pointer-events: none;
+}
+
+.btt-multiselect-option:hover,
+.btt-multiselect-option--active {
+  background-color: var(--btt-row-hover);
+}
+
+.btt-multiselect-empty {
+  padding: 5px 8px;
+  color: var(--btt-muted);
+}
+
+
+.btt-retry {
+  margin-left: 8px;
+}
+
+/* Pagination */
+
+.btt-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 10px;
+}
+
+.btt-page,
+.btt-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--btt-muted);
+}
+
+.btt-page-input {
+  width: 4.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.btt-page-size select {
+  cursor: pointer;
+}

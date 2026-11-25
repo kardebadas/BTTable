@@ -1,7 +1,8 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BTTable, type BTTableProps } from './BTTable';
+import { BTTable } from './BTTable';
+import type { BTTableClientProps } from './BTTableProps';
 import type { Column, FetchRows } from './core/types';
 
 type Row = { id: number; name: string; state: string };
@@ -17,7 +18,7 @@ const COLUMNS: Column<Row>[] = [
   { key: 'state', header: 'State', filter: { type: 'select', options: [{ value: 'ny', label: 'NY' }, { value: 'tx', label: 'TX' }] } },
 ];
 
-function setup(props: Partial<BTTableProps<Row>> = {}) {
+function setup(props: Partial<BTTableClientProps<Row>> = {}) {
   const view = render(<BTTable columns={COLUMNS} rows={ROWS} searchDebounceMs={0} {...props} />);
   return { ...view, user: userEvent.setup() };
 }
@@ -94,6 +95,15 @@ describe('search and counter', () => {
     cleanup();
     const { container } = setup({ showCounter: false });
     expect(container.querySelector('.btt-counter')).toBeNull();
+  });
+});
+
+describe('locale', () => {
+  it('formats the counter and the page count with the locale prop', () => {
+    const rows = Array.from({ length: 2500 }, (_, id) => ({ id, name: `Row ${id}`, state: 'ny' }));
+    setup({ rows, pageSize: 1, pageSizeOptions: [1], locale: 'de-DE' });
+    expect(screen.getByText('Showing 1–1 of 2.500')).toBeInTheDocument();
+    expect(screen.getByText('of 2.500')).toBeInTheDocument();
   });
 });
 

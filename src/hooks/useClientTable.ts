@@ -47,6 +47,13 @@ export type ClientTable<R> = TableActions & {
   pageSize: number;
   /** Valid rows before search and filters. */
   totalRows: number;
+  /**
+   * Identity of the view: applied search, filters, sort, page, page size and resets. The
+   * scroll position resets when it changes, not when only the data does.
+   */
+  viewKey: string;
+  /** Every valid row, in `rows` order, before search and filters. */
+  entries: RowEntry<R>[];
   /** Every row passing search and filters, sorted. */
   filteredRows: RowEntry<R>[];
   /** The rows of the current page (all filtered rows when pagination is off). */
@@ -114,7 +121,9 @@ export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTabl
     page,
     pageCount: pageCount(sorted.length, size),
     pageSize,
+    viewKey: JSON.stringify([state.resets, search, filters, sort, page, pageSize]),
     totalRows: entries.length,
+    entries,
     filteredRows: sorted,
     pageRows,
     selection,

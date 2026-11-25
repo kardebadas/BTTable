@@ -14,6 +14,8 @@ export type ToolbarSearch = {
 /** Props of `Toolbar`; every part is optional and is left out when its prop is. */
 export type ToolbarProps = {
   labels: BTTableLabels;
+  /** Locale of the counter's numbers; default: the runtime's. */
+  locale?: string;
   search?: ToolbarSearch;
   /** Counter data; `null` shows "No records", `undefined` hides the counter. */
   counter?: CounterData | null;
@@ -24,13 +26,17 @@ export type ToolbarProps = {
   extras?: ReactNode;
 };
 
-/** Counter text: "Showing 1–100 of 2,345", plus "(filtered from 50,000)", or "No records" for `null`. */
-export function formatCounter(counter: CounterData | null, labels: BTTableLabels): string {
+/**
+ * Counter text: "Showing 1–100 of 2,345", plus "(filtered from 50,000)", or "No records" for
+ * `null`. Numbers use the digit grouping of `locale` (default: the runtime's).
+ */
+export function formatCounter(counter: CounterData | null, labels: BTTableLabels, locale?: string): string {
   if (!counter) return labels.noRecords;
   const { from, to, total, filteredFrom } = counter;
-  const text = fillLabel(labels.counter, { from: formatCount(from), to: formatCount(to), total: formatCount(total) });
+  const count = (value: number) => formatCount(value, locale);
+  const text = fillLabel(labels.counter, { from: count(from), to: count(to), total: count(total) });
   if (filteredFrom === undefined) return text;
-  return `${text} ${fillLabel(labels.counterFiltered, { total: formatCount(filteredFrom) })}`;
+  return `${text} ${fillLabel(labels.counterFiltered, { total: count(filteredFrom) })}`;
 }
 
 function SearchBox({ value, placeholder, onChange, onClear, labels }: ToolbarSearch & { labels: BTTableLabels }) {
@@ -71,7 +77,7 @@ function ExportButtons({ labels, onExportCsv, exportFormats, onExport }: Toolbar
       )}
       {formats.map((format) => (
         <button key={format} type="button" className={`btt-export btt-export--${format}`} onClick={() => onExport?.(format)}>
-          {format.toUpperCase()}
+          {fillLabel(labels.exportFormat, { format: format.toUpperCase() })}
         </button>
       ))}
     </div>
@@ -90,11 +96,11 @@ function isEmpty({ search, counter, onExportCsv, exportFormats, onExport, extras
  */
 export function Toolbar(props: ToolbarProps) {
   if (isEmpty(props)) return null;
-  const { labels, search, counter, extras } = props;
+  const { labels, locale, search, counter, extras } = props;
   return (
     <div className="btt-toolbar">
       {search && <SearchBox {...search} labels={labels} />}
-      {counter !== undefined && <span className="btt-counter">{formatCounter(counter, labels)}</span>}
+      {counter !== undefined && <span className="btt-counter">{formatCounter(counter, labels, locale)}</span>}
       <ExportButtons {...props} />
       {extras !== undefined && extras !== null && <div className="btt-toolbar-extras">{extras}</div>}
     </div>

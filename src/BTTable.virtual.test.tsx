@@ -1,103 +1,25 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BTTable, type BTTableProps } from './BTTable';
-import type { RowAttributes } from './components/TableBody';
-import type { Column } from './core/types';
+import { act, fireEvent } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { BTTable } from './BTTable';
+import {
+  COLUMNS,
+  frames,
+  geometry,
+  installFakeGeometry,
+  makeRows,
+  MockResizeObserver,
+  mountedIds,
+  range,
+  rowElement,
+  rowElements,
+  rowProps,
+  scroller,
+  scrollTo,
+  setup,
+  spacers,
+} from './testing/virtualFixture';
 
-type Row = { id: number; name: string };
-
-const COLUMNS: Column<Row>[] = [
-  { key: 'id', header: 'Id', width: 80 },
-  { key: 'name', header: 'Name' },
-];
-const rowProps = (row: Row): RowAttributes => ({ 'data-row-id': row.id });
-const makeRows = (count: number): Row[] => Array.from({ length: count }, (_, id) => ({ id, name: `Row ${id}` }));
-const ROWS_1000 = makeRows(1000);
-
-/** Fake geometry: row heights by id (unknown → 0, i.e. unmeasurable), the viewport height, scroll positions. */
-const geometry = { heights: new Map<number, number>(), viewport: 200, scrollTops: new WeakMap<Element, number>() };
-let frames: FrameRequestCallback[] = [];
-
-class MockResizeObserver {
-  static instances: MockResizeObserver[] = [];
-  observed = new Set<Element>();
-  constructor(readonly callback: ResizeObserverCallback) {
-    MockResizeObserver.instances.push(this);
-  }
-  observe(element: Element) {
-    this.observed.add(element);
-  }
-  unobserve(element: Element) {
-    this.observed.delete(element);
-  }
-  disconnect = vi.fn(() => this.observed.clear());
-  /** Delivers a resize of the given elements, like the browser would: only for observed ones. */
-  trigger(targets: Element[]) {
-    const records = targets.filter((target) => this.observed.has(target)).map((target) => ({ target }));
-    if (records.length === 0) return;
-    act(() => this.callback(records as ResizeObserverEntry[], this as never));
-  }
-}
-
-function mockGeometry() {
-  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-    const id = (this as HTMLElement).dataset?.rowId;
-    let height = id === undefined ? 0 : (geometry.heights.get(Number(id)) ?? 0);
-    if (this.classList.contains('btt-scroll')) height = geometry.viewport;
-    return { height, width: 100, top: 0, left: 0, bottom: height, right: 100, x: 0, y: 0, toJSON: () => ({}) };
-  });
-  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains('btt-scroll') ? geometry.viewport : 0;
-  });
-  vi.spyOn(Element.prototype, 'scrollTop', 'get').mockImplementation(function (this: Element) {
-    return geometry.scrollTops.get(this) ?? 0;
-  });
-  vi.spyOn(Element.prototype, 'scrollTop', 'set').mockImplementation(function (this: Element, value: number) {
-    geometry.scrollTops.set(this, value);
-  });
-}
-
-beforeEach(() => {
-  geometry.heights.clear();
-  geometry.viewport = 200;
-  frames = [];
-  MockResizeObserver.instances = [];
-  mockGeometry();
-  vi.stubGlobal('ResizeObserver', MockResizeObserver);
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback));
-  vi.stubGlobal('cancelAnimationFrame', vi.fn());
-});
-
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-});
-
-function setup(props: Partial<BTTableProps<Row>> = {}) {
-  return render(<BTTable columns={COLUMNS} rows={ROWS_1000} pagination={false} rowProps={rowProps} {...props} />);
-}
-
-const scroller = (container: HTMLElement) => container.querySelector('.btt-scroll') as HTMLElement;
-const rowElements = (container: HTMLElement) => Array.from(container.querySelectorAll<HTMLElement>('tbody tr.btt-row'));
-const mountedIds = (container: HTMLElement) => rowElements(container).map((row) => Number(row.dataset.rowId));
-const rowElement = (container: HTMLElement, id: number) =>
-  container.querySelector(`tr[data-row-id="${id}"]`) as HTMLElement;
-
-function spacers(container: HTMLElement) {
-  const tbody = container.querySelector('tbody') as HTMLElement;
-  const height = (row: Element | null) => (row?.classList.contains('btt-spacer') ? (row as HTMLElement).style.height : null);
-  return { top: height(tbody.firstElementChild), bottom: height(tbody.lastElementChild) };
-}
-
-function scrollTo(container: HTMLElement, top: number) {
-  const element = scroller(container);
-  element.scrollTop = top;
-  fireEvent.scroll(element);
-  act(() => frames.splice(0).forEach((frame) => frame(0)));
-}
-
-const range = (from: number, to: number) => Array.from({ length: to - from }, (_, i) => from + i);
+installFakeGeometry();
 
 describe('when virtualization turns on', () => {
   it("'auto' mounts every row up to the threshold of 100", () => {
@@ -304,31 +226,6 @@ describe('accessibility', () => {
   });
 });
 
-describe('scroll position reset', () => {
-  it('scrolls back to the top when the rows change order', () => {
-    const { container } = setup();
-    scrollTo(container, 2000);
-    fireEvent.click(screen.getByRole('button', { name: /Name/ }));
-    expect(scroller(container).scrollTop).toBe(0);
-    expect(mountedIds(container)[0]).toBe(0);
-  });
-
-  it('scrolls back to the top when new data arrives', () => {
-    const { container, rerender } = setup();
-    scrollTo(container, 2000);
-    rerender(<BTTable columns={COLUMNS} rows={makeRows(1000)} pagination={false} rowProps={rowProps} />);
-    expect(scroller(container).scrollTop).toBe(0);
-  });
-
-  it('keeps the position on an unrelated re-render', () => {
-    const { container, rerender } = setup();
-    scrollTo(container, 2000);
-    rerender(<BTTable columns={COLUMNS} rows={ROWS_1000} pagination={false} rowProps={rowProps} loading />);
-    expect(scroller(container).scrollTop).toBe(2000);
-    expect(mountedIds(container)[0]).toBe(42);
-  });
-});
-
 describe('robustness', () => {
   it('falls back to estimated heights without ResizeObserver', () => {
     vi.stubGlobal('ResizeObserver', undefined);
@@ -349,7 +246,7 @@ describe('robustness', () => {
     // Every commit disconnects before re-observing, so only a new call proves the unmount cleanup.
     expect(observer.disconnect.mock.calls.length).toBeGreaterThan(disconnectsBefore);
     expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
-    frames = [];
+    frames.length = 0;
     fireEvent.scroll(element);
     expect(frames).toHaveLength(0);
   });

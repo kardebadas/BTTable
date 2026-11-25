@@ -1,84 +1,29 @@
-import { type ErrorInfo, type ReactNode, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { cx } from './components/classNames';
 import { ColGroup, tableMinWidth, toCssSize } from './components/ColGroup';
-import { type ControlProps, FooterControls, type TableControls, TopControls } from './components/Controls';
+import { FooterControls, type TableControls, TopControls } from './components/Controls';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { type RowCallbacks, TableBody } from './components/TableBody';
+import { TableBody } from './components/TableBody';
 import { TableHead } from './components/TableHead';
 import { buildExportData } from './core/export';
 import { getCounter } from './core/pagination';
-import type { Column, FetchRows, Query, SortState } from './core/types';
+import type { FetchRows, SortState } from './core/types';
 import { ownRowId } from './core/values';
-import { shouldVirtualize, type VirtualizeMode } from './core/virtual';
-import type { RowEntry, RowId } from './hooks/rowModel';
-import { type ClientTable as ClientTableModel, type ClientTableState, useClientTable } from './hooks/useClientTable';
+import { shouldVirtualize } from './core/virtual';
+import type { RowEntry } from './hooks/rowModel';
+import { type ClientTable as ClientTableModel, useClientTable } from './hooks/useClientTable';
 import { type ServerTable as ServerTableModel, useServerTable } from './hooks/useServerTable';
+import { isDevelopment, useRowWarnings } from './hooks/useRowWarnings';
 import { useVirtualRows } from './hooks/useVirtualRows';
+import type { BTTableAnyProps, BTTableProps } from './BTTableProps';
 import { type BTTableLabels, DEFAULT_LABELS } from './labels';
 
-/** Props of `BTTable`. Pass exactly one of `rows` (client mode) or `fetchRows` (server mode). */
-export type BTTableProps<R> = RowCallbacks<R> &
-  ControlProps & {
-  /**
-   * Should be stable (memoized): a new array re-derives and re-renders every row, and
-   * scrolls the table back to the top, on every parent render.
-   */
-  columns: readonly Column<R>[];
-  /** Should be stable (memoized): a new array is new data, so the table scrolls back to the top on every parent render. */
-  rows?: readonly R[];
-  /**
-   * Server mode data source, called for each page. A new function identity does not
-   * refetch: change `refreshKey` to refetch (e.g. when the fetcher captures a tenant id).
-   */
-  fetchRows?: FetchRows<R>;
-  /**
-   * Default: `row.id ?? row.ID ?? row.INDEX ?? row.N_ID`, else the index. Selection needs
-   * stable ids; in server mode the index is the position within the page, so ids collide
-   * across pages: server rows need real ids. Should be stable (memoized): a new function
-   * re-derives every row and scrolls the table back to the top on every parent render.
-   */
-  getRowId?: (row: R, index: number) => RowId;
-  /** Client mode only: `false` shows every filtered row. Server mode always paginates (development warning). */
-  pagination?: boolean;
-  pageSize?: number;
-  searchDebounceMs?: number;
-  /** Changing it clears search and filters and goes back to page 1, keeping sort and page size. */
-  resetKey?: unknown;
-  /** Server mode: changing it sends the current query again. */
-  refreshKey?: unknown;
-  /** Server mode: called with each query sent to `fetchRows` (for URL sync etc.). */
-  onQueryChange?: (query: Query) => void;
-  onStateChange?: (state: ClientTableState<R>) => void;
-  /**
-   * Checkbox column. In server mode select-all covers the current page, and selected ids
-   * are never pruned (rows on other pages are not loaded): clear stale ids through a
-   * controlled `selectedIds`.
-   */
-  selectable?: boolean;
-  selectedIds?: readonly RowId[];
-  defaultSelectedIds?: readonly RowId[];
-  onSelectionChange?: (ids: RowId[]) => void;
-  /** Number px or CSS size; `'none'` turns the inner vertical scroll and virtualization off. Default 600. */
-  maxHeight?: number | string;
-  /** Mount only the rows near the viewport: `'auto'` (default) above `virtualizeThreshold` rows, `true`, `false`. */
-  virtualize?: VirtualizeMode;
-  /** Row count above which `virtualize: 'auto'` turns on. Default 100. */
-  virtualizeThreshold?: number;
-  /** Px assumed for a row until it is measured; real heights replace it. Default 40. */
-  estimatedRowHeight?: number;
-  loading?: boolean;
-  emptyMessage?: ReactNode;
-  /** Visually hidden table caption, for assistive technology. */
-  caption?: ReactNode;
-  className?: string;
-  onError?: (error: Error, info: ErrorInfo) => void;
-  labels?: Partial<BTTableLabels>;
-};
-
-type ContentProps<R> = BTTableProps<R> & { labels: BTTableLabels };
+type ContentProps<R> = BTTableAnyProps<R> & { labels: BTTableLabels };
 
 type ViewProps<R> = ContentProps<R> & {
   entries: readonly RowEntry<R>[];
+  /** Identity of the view on screen; a change scrolls back to the top. */
+  viewKey: string;
   sort: SortState;
   onSort: (key: string) => void;
   /** Toolbar, filters, footer and selection state; without it only the table renders. */
@@ -88,35 +33,12 @@ type ViewProps<R> = ContentProps<R> & {
 /** The status strip always keeps one line of height, so loading never shifts the table. */
 const STATUS_STYLE = { minHeight: '1.5em' } as const;
 
-/**
- * True unless `process.env.NODE_ENV` is `'production'`. Bundlers replace that expression
- * text even where `process` does not exist, so it must be read directly, not behind a
- * `typeof process` guard; without a bundler the read throws and counts as development.
- */
-function isDevelopment(): boolean {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-}
-
 /** Throws when not exactly one of `rows` / `fetchRows` is passed. */
-function assertOneSource<R>({ rows, fetchRows }: BTTableProps<R>): void {
+function assertOneSource<R>({ rows, fetchRows }: BTTableAnyProps<R>): void {
   const hasRows = rows !== undefined && rows !== null;
   if (hasRows !== Boolean(fetchRows)) return;
   const got = hasRows ? 'both' : 'neither';
   throw new Error(`BTTable: pass exactly one of \`rows\` or \`fetchRows\` (got ${got}).`);
-}
-
-/** Warns once per `rows` change, in development, when invalid rows were skipped. */
-function useInvalidRowWarning(rows: readonly unknown[], validCount: number): void {
-  const skipped = rows.length - validCount;
-  useEffect(() => {
-    if (skipped > 0 && isDevelopment()) {
-      console.warn(`BTTable: skipped ${skipped} invalid rows (null or not an object).`);
-    }
-  }, [rows, skipped]);
 }
 
 const DEFAULT_ROW_HEIGHT = 40;
@@ -129,11 +51,11 @@ function rowEstimate(estimatedRowHeight: number | undefined): number {
 
 /** Virtualization per the `maxHeight` / `virtualize` / `virtualizeThreshold` / `estimatedRowHeight` props. */
 function useTableVirtualization<R>(props: ViewProps<R>) {
-  const { entries, maxHeight = 600, virtualize = 'auto', virtualizeThreshold = 100 } = props;
+  const { entries, viewKey, maxHeight = 600, virtualize = 'auto', virtualizeThreshold = 100 } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   const enabled = shouldVirtualize({ virtualize, maxHeight, rowCount: entries.length, threshold: virtualizeThreshold });
   const estimatedRowHeight = rowEstimate(props.estimatedRowHeight);
-  const range = useVirtualRows({ entries, enabled, estimatedRowHeight, scrollRef });
+  const range = useVirtualRows({ entries, viewKey, enabled, estimatedRowHeight, scrollRef });
   return { scrollRef, enabled, range, maxHeight };
 }
 
@@ -219,9 +141,10 @@ function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): 
 
 function ClientTable<R>(props: ContentProps<R> & { rows: readonly R[] }) {
   const table = useClientTable(props);
-  useInvalidRowWarning(props.rows, table.totalRows);
+  useRowWarnings(props.rows, table.entries);
   const controls = clientControls(table, props);
-  return <TableView {...props} entries={table.pageRows} sort={table.sort} onSort={table.toggleSort} controls={controls} />;
+  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort };
+  return <TableView {...props} {...view} controls={controls} />;
 }
 
 /** The body row of a failed server request: the error text and a Retry button. */
@@ -268,9 +191,10 @@ function useServerWarnings<R>(props: ContentProps<R>, pageRows: readonly RowEntr
 function ServerTable<R>(props: ContentProps<R> & { fetchRows: FetchRows<R> }) {
   const table = useServerTable(props);
   useServerWarnings(props, table.pageRows);
+  useRowWarnings(table.responseRows, table.pageRows);
   const loading = Boolean(props.loading) || table.loading;
   const emptyMessage = table.error ? <LoadError labels={props.labels} onRetry={table.retry} /> : props.emptyMessage;
-  const view = { entries: table.pageRows, loading, emptyMessage, sort: table.sort, onSort: table.toggleSort, pagination: true };
+  const view = { entries: table.pageRows, viewKey: table.viewKey, loading, emptyMessage, sort: table.sort, onSort: table.toggleSort, pagination: true };
   return <TableView {...props} {...view} controls={serverControls(table, props)} />;
 }
 

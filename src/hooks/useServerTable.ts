@@ -35,8 +35,15 @@ export type ServerTable<R> = TableActions & {
   page: number;
   pageCount: number;
   pageSize: number;
-  /** The rows of the last accepted response, none after a failure; `index` is the position within the page. */
+  /** The rows of the last accepted response as sent, none after a failure (invalid entries included). */
+  responseRows: readonly R[];
+  /** The valid rows of `responseRows`; `index` is the position within the page. */
   pageRows: RowEntry<R>[];
+  /**
+   * Identity of the view on screen: the query (and resets) of the shown response. The
+   * scroll position resets when it changes, not when the same query is answered again.
+   */
+  viewKey: string;
   /** `undefined` hides the counter: before the first response and after a failure. */
   counter: CounterData | null | undefined;
   loading: boolean;
@@ -114,8 +121,10 @@ export function useServerTable<R>(options: UseServerTableOptions<R>): ServerTabl
   const query = buildQuery(state, options.columns);
   const onResult = useCallback((sent: Query, result: FetchResult<R>) => clampToResult(dispatch, sent, result), [dispatch]);
   const delay = options.searchDebounceMs ?? DEFAULT_DEBOUNCE_MS;
-  const fetchInput = { fetchRows: options.fetchRows, query, queryKey: JSON.stringify(query), typedKey: typedFiltersKey(query), generation, delay };
-  const { result, loading, error } = useServerFetch({ ...fetchInput, onQueryChange: options.onQueryChange, onResult });
+  const queryKey = JSON.stringify(query);
+  const keys = { queryKey, viewKey: `${state.resets}:${queryKey}`, typedKey: typedFiltersKey(query), generation };
+  const fetchInput = { fetchRows: options.fetchRows, query, ...keys, delay, onQueryChange: options.onQueryChange, onResult };
+  const { result, viewKey, loading, error } = useServerFetch(fetchInput);
 
   const getRowId = options.getRowId ?? defaultGetRowId;
   // After a failure no rows show, so select-all and export cover nothing stale.
@@ -135,6 +144,8 @@ export function useServerTable<R>(options: UseServerTableOptions<R>): ServerTabl
     page: state.page,
     pageCount: serverPageCount(result, query),
     pageSize: state.pageSize,
+    viewKey,
+    responseRows: rows,
     pageRows,
     counter,
     loading,

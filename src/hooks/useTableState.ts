@@ -30,7 +30,7 @@ function pageSizeOf<R>(options: TableStateOptions<R>): number {
 }
 
 function initState<R>(options: TableStateOptions<R>): TableState {
-  return { searchInput: '', search: '', filters: defaultFilters(options.columns), sort: null, page: 1, pageSize: pageSizeOf(options) };
+  return { searchInput: '', search: '', filters: defaultFilters(options.columns), sort: null, page: 1, pageSize: pageSizeOf(options), resets: 0 };
 }
 
 /** Applies the typed search after `delay` ms of quiet; each keystroke restarts the wait. */

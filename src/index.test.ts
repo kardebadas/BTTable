@@ -15,6 +15,12 @@ describe('package entry', () => {
     expect(typeof api.BTTable).toBe('function');
   });
 
+  it('exports the default labels and the VirtualizeMode type', () => {
+    expect(api.DEFAULT_LABELS.loading).toBe('Loading…');
+    const mode: api.VirtualizeMode = 'auto';
+    expect(mode).toBe('auto');
+  });
+
   it('runs in jsdom with jest-dom matchers', () => {
     document.body.innerHTML = '<div class="btt">table</div>';
     expect(document.querySelector('.btt')).toBeInTheDocument();

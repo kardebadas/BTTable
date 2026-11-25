@@ -22,10 +22,36 @@ export function optionText(option: Option): string {
   return typeof label === 'string' || typeof label === 'number' ? String(label) : option.value;
 }
 
+/** Accessible summary of the choice: "All", the one label, or "N selected". */
 function summary({ options, value, labels }: MultiSelectProps): ReactNode {
   if (value.length === 0) return labels.filterAll;
   if (value.length > 1) return fillLabel(labels.multiSelected, { count: value.length });
   return options.find((option) => option.value === value[0])?.label ?? value[0];
+}
+
+/** Chips shown on the button before the rest collapse into a "+N" chip. */
+const MAX_CHIPS = 2;
+
+/** The visible summary: "All", or up to two chips of the chosen labels and a "+N" chip for the rest. */
+function Chips({ options, value, labels }: MultiSelectProps) {
+  if (value.length === 0) {
+    return (
+      <span className="btt-multiselect-summary" aria-hidden="true">
+        {labels.filterAll}
+      </span>
+    );
+  }
+  const rest = value.length - MAX_CHIPS;
+  return (
+    <span className="btt-multiselect-summary" aria-hidden="true">
+      {value.slice(0, MAX_CHIPS).map((item) => (
+        <span key={item} className="btt-chip">
+          {options.find((option) => option.value === item)?.label ?? item}
+        </span>
+      ))}
+      {rest > 0 && <span className="btt-chip btt-chip--more">+{rest}</span>}
+    </span>
+  );
 }
 
 function toggleValue(value: readonly string[], item: string): string[] {
@@ -208,11 +234,13 @@ function Popover(popover: PopoverProps) {
 }
 
 /**
- * Package-owned multi-choice dropdown: a button summarising the choice ("All", the one
- * label, or "N selected") that opens a popover with a search box and a listbox of
- * checkbox options. Keyboard: ArrowDown opens and enters the list, arrows move, Space or
- * Enter toggles, Escape closes and returns focus to the button. A press outside or focus
- * leaving closes it. Fully controlled by `value`.
+ * Package-owned multi-choice dropdown: a button showing the choice as chips (up to two
+ * labels, then "+N"; "All" when empty), named by its label plus a hidden summary ("All",
+ * the one label, or "N selected"). It opens a popover with a search box and a listbox of
+ * checkbox options. Keyboard: ArrowDown on the button opens it and focuses the search box,
+ * ArrowDown there enters the list, arrows move, Space or Enter toggles, Escape closes and
+ * returns focus to the button. A press outside or focus leaving closes it. Fully
+ * controlled by `value`.
  */
 export function MultiSelect(props: MultiSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -245,7 +273,10 @@ export function MultiSelect(props: MultiSelectProps) {
         onClick={() => (ctl.open ? ctl.close() : ctl.setOpen(true))}
         onKeyDown={onButtonKey}
       >
-        <span id={summaryId}>{summary(props)}</span>
+        <span id={summaryId} className="btt-sr-only">
+          {summary(props)}
+        </span>
+        <Chips {...props} />
       </button>
       {ctl.open && <Popover ctl={ctl} listId={listId} props={props} searchRef={searchRef} listRef={listRef} />}
     </div>

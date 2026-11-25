@@ -1,6 +1,8 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../src/styles.css';
+import '../src/styles/theme.css';
+import '../src/styles/table.css';
+import '../src/styles/controls.css';
 import { ClientDemo } from './ClientDemo';
 import './demo.css';
 import { ServerDemo } from './ServerDemo';

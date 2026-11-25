@@ -1,7 +1,8 @@
-import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { anchoredScrollTop, rowOffsets, type VirtualWindow, virtualWindow } from '../core/virtual';
 import type { RowEntry, RowId } from './rowModel';
+import { useBrowserLayoutEffect } from './useBrowserLayoutEffect';
 
 /** Rows mounted beyond each edge of the viewport. */
 export const OVERSCAN = 8;
@@ -9,6 +10,8 @@ export const OVERSCAN = 8;
 /** Input of `useVirtualRows`. */
 export type UseVirtualRowsInput<R> = {
   entries: readonly RowEntry<R>[];
+  /** Identity of the view (page, sort, search, filters, resets): a change scrolls back to the top. */
+  viewKey: string;
   enabled: boolean;
   /** Height in px assumed for a row until it has been measured. */
   estimatedRowHeight: number;
@@ -41,9 +44,6 @@ type Setters<R> = {
 type Shared<R> = { live: RefObject<Live<R>>; cache: Heights; scrollRef: RefObject<HTMLElement | null>; setters: Setters<R> };
 
 const NO_OFFSETS = [0];
-
-/** Layout effect in the browser, plain effect on the server (where neither runs), without React 18's SSR warning. */
-const useBrowserLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
 function offsetsOf<R>(entries: readonly RowEntry<R>[], heights: Heights, estimate: number): number[] {
   return rowOffsets(entries.map((entry) => heights.get(entry.id) ?? estimate));
@@ -183,23 +183,24 @@ function useScrollTracking(enabled: boolean, scrollRef: RefObject<HTMLElement | 
   }, [enabled, scrollRef, setScrollTop]);
 }
 
-function startNewList<R>({ cache, scrollRef, setters }: Shared<R>, entries: readonly RowEntry<R>[]): void {
-  pruneHeights(cache, entries);
+function scrollToTop<R>({ scrollRef, setters }: Shared<R>): void {
   if (scrollRef.current) scrollRef.current.scrollTop = 0;
   setters.setScrollTop(0);
 }
 
 /**
- * When the list itself changes (data, page, sort, filters), not on other re-renders:
- * scrolls back to the top and forgets the heights of rows that left the list.
+ * A new list forgets the heights of rows that left it; a new view (page, sort, search,
+ * filters, reset) also scrolls back to the top. New data for the same view (polling, a
+ * refresh) keeps the reader's place.
  */
-function useListChange<R>(entries: readonly RowEntry<R>[], shared: Shared<R>): void {
-  const previous = useRef(entries);
+function useListChange<R>(entries: readonly RowEntry<R>[], viewKey: string, shared: Shared<R>): void {
+  const previous = useRef({ entries, viewKey });
   useBrowserLayoutEffect(() => {
-    if (previous.current === entries) return;
-    previous.current = entries;
-    startNewList(shared, entries);
-  }, [entries, shared]);
+    const last = previous.current;
+    previous.current = { entries, viewKey };
+    if (last.entries !== entries) pruneHeights(shared.cache, entries);
+    if (last.viewKey !== viewKey) scrollToTop(shared);
+  }, [entries, viewKey, shared]);
 }
 
 /** The offsets to render: the last measurement's when it was for this list and estimate, else one fresh pass. */
@@ -216,10 +217,10 @@ function useOffsets<R>(input: { enabled: boolean; entries: readonly RowEntry<R>[
  * Row virtualization for the scroll container in `scrollRef`: which entries to mount and
  * the spacer heights around them. Row heights are measured (one `ResizeObserver`, cached by
  * row id) and stand in for `estimatedRowHeight` once known; the first visible row stays put
- * when heights above it change; the scroll position resets to the top when `entries`
- * changes identity. When `enabled` is false every entry is mounted, with no spacers.
+ * when heights above it change; the scroll position resets to the top when `viewKey`
+ * changes. When `enabled` is false every entry is mounted, with no spacers.
  */
-export function useVirtualRows<R>({ entries, enabled, estimatedRowHeight, scrollRef }: UseVirtualRowsInput<R>): VirtualWindow {
+export function useVirtualRows<R>({ entries, viewKey, enabled, estimatedRowHeight, scrollRef }: UseVirtualRowsInput<R>): VirtualWindow {
   const [cache] = useState<Heights>(() => new Map());
   const [layout, setLayout] = useState<Layout<R>>({ entries: [], estimate: estimatedRowHeight, offsets: NO_OFFSETS });
   const [scrollTop, setScrollTop] = useState(0);
@@ -234,7 +235,7 @@ export function useVirtualRows<R>({ entries, enabled, estimatedRowHeight, scroll
     ? virtualWindow({ offsets, scrollTop, viewportHeight, overscan: OVERSCAN })
     : { start: 0, end: entries.length, padTop: 0, padBottom: 0 };
 
-  useListChange(entries, shared);
+  useListChange(entries, viewKey, shared);
   useScrollTracking(enabled, scrollRef, setScrollTop);
   const observer = useResizeObserver(enabled, shared);
   const commit = { enabled, entries, estimate: estimatedRowHeight, offsets, start: window.start, observer };

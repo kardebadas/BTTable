@@ -43,10 +43,25 @@ describe('buildQuery', () => {
       name: { type: 'text', op: 'startsWith', value: 'An' },
       age: { type: 'number', op: 'gte', value: 30 },
       score: { type: 'number', op: 'range', value: [1.5, null] },
-      born: { type: 'date', value: '2020-03-04' },
+      born: { type: 'date', op: 'on', value: '2020-03-04' },
       seen: { type: 'date', op: 'range', value: [null, '2021-12-31'] },
       tags: { type: 'multiselect', value: ['a', 'b'] },
       email: { type: 'notEmpty', value: true },
+    });
+  });
+});
+
+describe('operators', () => {
+  it('sends the default operator of text, number and date filters that set none', () => {
+    const columns: Column<Row>[] = [
+      { key: 'a', header: 'A', filter: { type: 'text' } },
+      { key: 'b', header: 'B', filter: { type: 'number' } },
+      { key: 'c', header: 'C', filter: { type: 'date' } },
+    ];
+    expect(buildQuery({ ...BASE, filters: { a: 'x', b: 2, c: '2024-01-31' } }, columns).filters).toEqual({
+      a: { type: 'text', op: 'contains', value: 'x' },
+      b: { type: 'number', op: 'eq', value: 2 },
+      c: { type: 'date', op: 'on', value: '2024-01-31' },
     });
   });
 });

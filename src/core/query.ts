@@ -25,7 +25,18 @@ function typedValue(spec: FilterSpec, value: FilterValue): unknown {
   return value;
 }
 
-/** The active filters of `columns`, keyed by column key, with their type, operator and typed value. */
+const DEFAULT_OPS: Partial<Record<FilterSpec['type'], string>> = { text: 'contains', number: 'eq', date: 'on' };
+
+/** The operator of a filter: the column's `op`, else the default of its type; none for types without operators. */
+function resolvedOp(spec: FilterSpec): string | undefined {
+  if ('op' in spec && spec.op !== undefined) return spec.op;
+  return DEFAULT_OPS[spec.type];
+}
+
+/**
+ * The active filters of `columns`, keyed by column key, with their type, resolved operator
+ * (text, number and date filters) and typed value.
+ */
 function activeFilters<R>(columns: readonly Column<R>[], filters: FilterState): Query['filters'] {
   const result: Query['filters'] = {};
   for (const column of columns) {
@@ -33,7 +44,8 @@ function activeFilters<R>(columns: readonly Column<R>[], filters: FilterState): 
     const value = filters[column.key];
     if (!spec || !isFilterActive(spec, value)) continue;
     const entry: Query['filters'][string] = { type: spec.type, value: typedValue(spec, value) };
-    if ('op' in spec && spec.op !== undefined) entry.op = spec.op;
+    const op = resolvedOp(spec);
+    if (op !== undefined) entry.op = op;
     result[column.key] = entry;
   }
   return result;
