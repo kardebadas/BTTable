@@ -41,11 +41,14 @@ describe('layout of the controls', () => {
     expect(container.querySelectorAll('tr.btt-row')).toHaveLength(2);
   });
 
-  it('renders no controls in the server-mode shell', () => {
-    const fetchRows = vi.fn() as unknown as FetchRows<Row>;
+  it('renders the same controls and selection column in server mode', async () => {
+    const fetchRows: FetchRows<Row> = vi.fn(async () => ({ rows: ROWS, totalRows: 3 }));
     const { container } = render(<BTTable columns={COLUMNS} fetchRows={fetchRows} selectable />);
-    expect(container.querySelector('.btt-toolbar, .btt-filters, .btt-pagination')).toBeNull();
-    expect(container.querySelector('thead input')).toBeNull();
+    const root = container.firstElementChild as HTMLElement;
+    const order = Array.from(root.children).map((child) => child.className.split(' ')[0]);
+    expect(order).toEqual(['btt-filters', 'btt-toolbar', 'btt-status', 'btt-scroll', 'btt-pagination']);
+    expect(container.querySelector('thead input')).toHaveAttribute('aria-label', 'Select all');
+    await waitFor(() => expect(names(container)).toEqual(['Ana', 'Bruno', 'Carla']));
   });
 });
 

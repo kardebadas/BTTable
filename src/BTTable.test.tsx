@@ -51,11 +51,11 @@ describe('mode validation', () => {
     expect(onError.mock.calls[0][0].message).toMatch(/neither/);
   });
 
-  it('renders the table shell with no rows in server mode', () => {
-    const fetchRows = vi.fn() as unknown as FetchRows<Row>;
+  it('renders the table in server mode from fetchRows', async () => {
+    const fetchRows: FetchRows<Row> = vi.fn(async () => ({ rows: [], totalRows: 0 }));
     const { container } = render(<BTTable columns={COLUMNS} fetchRows={fetchRows} />);
     expect(container.querySelectorAll('thead th')).toHaveLength(3);
-    expect(screen.getByText('No records found')).toBeInTheDocument();
+    expect(await screen.findByText('No records found')).toBeInTheDocument();
   });
 });
 

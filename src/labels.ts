@@ -7,6 +7,10 @@ export type BTTableLabels = {
   loading: string;
   /** Fallback text after a render error. */
   error: string;
+  /** Server mode: error row text when `fetchRows` rejects. */
+  loadError: string;
+  /** Server mode: the error row's button that sends the request again. */
+  retry: string;
   /** Accessible name of the search box. */
   search: string;
   /** Accessible name of the button that clears the search box. */
@@ -55,6 +59,8 @@ export type BTTableLabels = {
 export const DEFAULT_LABELS: BTTableLabels = {
   loading: 'Loading…',
   error: 'Something went wrong.',
+  loadError: 'Could not load the rows.',
+  retry: 'Retry',
   search: 'Search',
   clearSearch: 'Clear search',
   counter: 'Showing {from}–{to} of {total}',

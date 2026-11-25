@@ -3,19 +3,24 @@ import type { Column } from './types';
 
 const ID_KEYS = ['id', 'ID', 'INDEX', 'N_ID'] as const;
 
+/** The first string or number among `row.id`, `row.ID`, `row.INDEX`, `row.N_ID`; `undefined` when none. */
+export function ownRowId(row: unknown): string | number | undefined {
+  if (typeof row !== 'object' || row === null) return undefined;
+  const record = row as Record<string, unknown>;
+  for (const key of ID_KEYS) {
+    const id = record[key];
+    if (typeof id === 'string' || typeof id === 'number') return id;
+  }
+  return undefined;
+}
+
 /**
  * Default row id: the first string or number among `row.id`, `row.ID`, `row.INDEX`,
  * `row.N_ID`, else the row's index. Selection needs stable ids; the index fallback is
  * positional and changes when rows are reordered or replaced.
  */
 export function getRowId(row: unknown, index: number): string | number {
-  if (typeof row !== 'object' || row === null) return index;
-  const record = row as Record<string, unknown>;
-  for (const key of ID_KEYS) {
-    const id = record[key];
-    if (typeof id === 'string' || typeof id === 'number') return id;
-  }
-  return index;
+  return ownRowId(row) ?? index;
 }
 
 /** The raw value of `column` for `row`: `column.value(row)`, else `row[column.key]`. */

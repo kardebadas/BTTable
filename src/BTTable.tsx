@@ -7,10 +7,12 @@ import { type RowCallbacks, TableBody } from './components/TableBody';
 import { TableHead } from './components/TableHead';
 import { buildExportData } from './core/export';
 import { getCounter } from './core/pagination';
-import type { Column, FetchRows, SortState } from './core/types';
+import type { Column, FetchRows, Query, SortState } from './core/types';
+import { ownRowId } from './core/values';
 import { shouldVirtualize, type VirtualizeMode } from './core/virtual';
 import type { RowEntry, RowId } from './hooks/rowModel';
 import { type ClientTable as ClientTableModel, type ClientTableState, useClientTable } from './hooks/useClientTable';
+import { type ServerTable as ServerTableModel, useServerTable } from './hooks/useServerTable';
 import { useVirtualRows } from './hooks/useVirtualRows';
 import { type BTTableLabels, DEFAULT_LABELS } from './labels';
 
@@ -24,18 +26,34 @@ export type BTTableProps<R> = RowCallbacks<R> &
   columns: readonly Column<R>[];
   /** Should be stable (memoized): a new array is new data, so the table scrolls back to the top on every parent render. */
   rows?: readonly R[];
+  /**
+   * Server mode data source, called for each page. A new function identity does not
+   * refetch: change `refreshKey` to refetch (e.g. when the fetcher captures a tenant id).
+   */
   fetchRows?: FetchRows<R>;
   /**
    * Default: `row.id ?? row.ID ?? row.INDEX ?? row.N_ID`, else the index. Selection needs
-   * stable ids. Should be stable (memoized): a new function re-derives every row and
-   * scrolls the table back to the top on every parent render.
+   * stable ids; in server mode the index is the position within the page, so ids collide
+   * across pages: server rows need real ids. Should be stable (memoized): a new function
+   * re-derives every row and scrolls the table back to the top on every parent render.
    */
   getRowId?: (row: R, index: number) => RowId;
+  /** Client mode only: `false` shows every filtered row. Server mode always paginates (development warning). */
   pagination?: boolean;
   pageSize?: number;
   searchDebounceMs?: number;
+  /** Changing it clears search and filters and goes back to page 1, keeping sort and page size. */
   resetKey?: unknown;
+  /** Server mode: changing it sends the current query again. */
+  refreshKey?: unknown;
+  /** Server mode: called with each query sent to `fetchRows` (for URL sync etc.). */
+  onQueryChange?: (query: Query) => void;
   onStateChange?: (state: ClientTableState<R>) => void;
+  /**
+   * Checkbox column. In server mode select-all covers the current page, and selected ids
+   * are never pruned (rows on other pages are not loaded): clear stale ids through a
+   * controlled `selectedIds`.
+   */
   selectable?: boolean;
   selectedIds?: readonly RowId[];
   defaultSelectedIds?: readonly RowId[];
@@ -67,8 +85,6 @@ type ViewProps<R> = ContentProps<R> & {
   controls?: TableControls;
 };
 
-const NO_ENTRIES: RowEntry<never>[] = [];
-const ignoreSort = () => {};
 /** The status strip always keeps one line of height, so loading never shifts the table. */
 const STATUS_STYLE = { minHeight: '1.5em' } as const;
 
@@ -208,11 +224,61 @@ function ClientTable<R>(props: ContentProps<R> & { rows: readonly R[] }) {
   return <TableView {...props} entries={table.pageRows} sort={table.sort} onSort={table.toggleSort} controls={controls} />;
 }
 
-/** Validates the mode, then renders client mode, or the empty shell for `fetchRows` (server mode). */
+/** The body row of a failed server request: the error text and a Retry button. */
+function LoadError({ labels, onRetry }: { labels: BTTableLabels; onRetry: () => void }) {
+  return (
+    <span className="btt-error" role="alert">
+      {labels.loadError}{' '}
+      <button type="button" className="btt-retry" onClick={onRetry}>
+        {labels.retry}
+      </button>
+    </span>
+  );
+}
+
+/**
+ * Controls of server mode. Export (CSV and `onExport`) covers the rows of the current page
+ * only: the other pages live on the server.
+ */
+function serverControls<R>(table: ServerTableModel<R>, props: ContentProps<R>): TableControls {
+  const exportData = () => buildExportData(props.columns, table.pageRows.map((entry) => entry.row));
+  return { ...table, exportData };
+}
+
+/** Logs `message` once per mount, in development, the first time `condition` holds. */
+function useWarnOnce(condition: boolean, message: string): void {
+  const warned = useRef(false);
+  useEffect(() => {
+    if (!condition || warned.current || !isDevelopment()) return;
+    warned.current = true;
+    console.warn(message);
+  }, [condition, message]);
+}
+
+/** Development warnings of server mode: ignored `pagination={false}` and selectable rows without ids. */
+function useServerWarnings<R>(props: ContentProps<R>, pageRows: readonly RowEntry<R>[]): void {
+  useWarnOnce(props.pagination === false, 'BTTable: pagination={false} is ignored in server mode; pages always come from fetchRows.');
+  const missingIds = Boolean(props.selectable) && !props.getRowId && pageRows.some((entry) => ownRowId(entry.row) === undefined);
+  useWarnOnce(
+    missingIds,
+    'BTTable: selectable server rows need ids: give rows an id/ID/INDEX/N_ID field or pass getRowId, or selections collide across pages.',
+  );
+}
+
+function ServerTable<R>(props: ContentProps<R> & { fetchRows: FetchRows<R> }) {
+  const table = useServerTable(props);
+  useServerWarnings(props, table.pageRows);
+  const loading = Boolean(props.loading) || table.loading;
+  const emptyMessage = table.error ? <LoadError labels={props.labels} onRetry={table.retry} /> : props.emptyMessage;
+  const view = { entries: table.pageRows, loading, emptyMessage, sort: table.sort, onSort: table.toggleSort, pagination: true };
+  return <TableView {...props} {...view} controls={serverControls(table, props)} />;
+}
+
+/** Validates the mode, then renders client mode (`rows`) or server mode (`fetchRows`). */
 function TableContent<R>(props: ContentProps<R>) {
   assertOneSource(props);
   if (props.rows) return <ClientTable {...props} rows={props.rows} />;
-  return <TableView {...props} entries={NO_ENTRIES} sort={null} onSort={ignoreSort} />;
+  return <ServerTable {...props} fetchRows={props.fetchRows as FetchRows<R>} />;
 }
 
 /**

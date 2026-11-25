@@ -19,11 +19,14 @@ export type ControlProps = {
   pageSizeOptions?: readonly number[];
   /** "Showing 1–100 of 2,345" / "No records" in the toolbar. Default `true`. */
   showCounter?: boolean;
-  /** A CSV button that downloads every filtered row. Default `false`. */
+  /** A CSV button that downloads every filtered row (server mode: the rows of the current page). Default `false`. */
   exportCsv?: boolean;
   /** Default `'table.csv'`. */
   exportFileName?: string;
-  /** Called by the `exportFormats` buttons with every filtered row, for caller-side PDF or spreadsheet writers. */
+  /**
+   * Called by the `exportFormats` buttons with every filtered row (server mode: the rows of the
+   * current page), for caller-side PDF or spreadsheet writers.
+   */
   onExport?: (format: string, data: ExportData) => void;
   /** Extra export format names, one toolbar button each, calling `onExport`. Default `[]`. */
   exportFormats?: readonly string[];
@@ -44,8 +47,9 @@ export type TableControls = {
   pageSize: number;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
-  counter: CounterData | null;
-  /** The export payload for every filtered row; called on click only. */
+  /** `null` shows "No records"; `undefined` hides the counter. */
+  counter: CounterData | null | undefined;
+  /** The export payload for every filtered row (server mode: the current page); called on click only. */
   exportData: () => ExportData;
   selection: Selection;
 };
