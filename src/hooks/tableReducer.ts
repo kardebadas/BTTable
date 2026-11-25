@@ -10,7 +10,22 @@ export type TableState = {
   pageSize: number;
   /** How many times `resetKey` has reset the view; part of the view key. */
   resets: number;
+  /** What the table proposed for controlled pieces and has not heard back about. */
+  proposals: Proposals;
 };
+
+/** Proposals still waiting for the parent's answer. */
+export type Proposals = {
+  /** The page prop the table moved away from; while the prop still equals it, the own page shows. */
+  pageHold?: number;
+  /** Reported search values not yet echoed back, oldest first. */
+  searches: readonly string[];
+  /** Reported filter states not yet echoed back, oldest first. */
+  filters: readonly FilterState[];
+};
+
+/** No proposal waiting. */
+export const NO_PROPOSALS: Proposals = { searches: [], filters: [] };
 
 /** State transitions of the client table. */
 export type TableAction =
@@ -20,7 +35,10 @@ export type TableAction =
   | { type: 'sort'; key: string }
   | { type: 'page'; page: number }
   | { type: 'pageSize'; pageSize: number }
-  | { type: 'reset'; filters: FilterState };
+  | { type: 'reset'; filters: FilterState; search: string };
+
+/** A transition of the view state: the state it started from and the state it produced. */
+export type Transition = { from: TableState; to: TableState };
 
 /** The `defaultValue` of every column filter that has one, keyed by column key. */
 export function defaultFilters<R>(columns: readonly Column<R>[]): FilterState {
@@ -46,9 +64,20 @@ function setFilter(state: TableState, key: string, value: FilterValue): TableSta
 }
 
 /**
- * Reducer of the client table. Applying a new search, changing a filter or the page size,
- * and resetting go back to page 1; sorting resets nothing. Setting a filter to its current
- * value is a no-op.
+ * Reducer of the table's own state: `state` with every field that differs (`Object.is`)
+ * between `from` and `to` taken from `to`. The other fields keep their value, so a change
+ * made over controlled props never overwrites the table's own value of a field it did not
+ * change.
+ */
+export function mergeChanges(state: TableState, { from, to }: Transition): TableState {
+  const changed = Object.entries(to).filter(([key, value]) => !Object.is(from[key as keyof TableState], value));
+  return changed.length === 0 ? state : { ...state, ...Object.fromEntries(changed) };
+}
+
+/**
+ * Reducer of the view state. Applying a new search, changing a filter or the page size,
+ * and resetting (to the given defaults) go back to page 1; sorting resets nothing. Setting
+ * a filter to its current value is a no-op.
  */
 export function tableReducer(state: TableState, action: TableAction): TableState {
   switch (action.type) {
@@ -65,6 +94,6 @@ export function tableReducer(state: TableState, action: TableAction): TableState
     case 'pageSize':
       return { ...state, pageSize: Number(action.pageSize), page: 1 };
     case 'reset':
-      return { ...state, searchInput: '', search: '', filters: action.filters, page: 1, resets: state.resets + 1 };
+      return { ...state, searchInput: action.search, search: action.search, filters: action.filters, page: 1, resets: state.resets + 1 };
   }
 }

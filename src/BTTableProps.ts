@@ -5,11 +5,13 @@ import type { Column, FetchRows, Query } from './core/types';
 import type { VirtualizeMode } from './core/virtual';
 import type { RowId, RowSource } from './hooks/rowModel';
 import type { ClientTableState } from './hooks/useClientTable';
+import type { ViewStateProps } from './hooks/viewState';
 import type { BTTableLabels } from './labels';
 
 /** Props of `BTTable` shared by both data modes. */
 export type BTTableCommonProps<R> = RowCallbacks<R> &
-  ControlProps & {
+  ControlProps &
+  ViewStateProps & {
   /** Should be stable (memoized): a new array re-derives and re-renders every row on every parent render. */
   columns: readonly Column<R>[];
   /**
@@ -24,7 +26,10 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
   pagination?: boolean;
   pageSize?: number;
   searchDebounceMs?: number;
-  /** Changing it clears search and filters and goes back to page 1, keeping sort and page size. */
+  /**
+   * Changing it puts search and filters back to their defaults (`defaultSearchValue`,
+   * `defaultFilters`, column defaults) and goes back to page 1, keeping sort and page size.
+   */
   resetKey?: unknown;
   /** Server mode: changing it sends the current query again. */
   refreshKey?: unknown;

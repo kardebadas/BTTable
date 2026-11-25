@@ -1,16 +1,16 @@
-import { type Dispatch, useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { type CounterData, getCounter, pageCount } from '../core/pagination';
 import { buildQuery, typedFiltersKey } from '../core/query';
 import type { Column, FetchResult, FetchRows, FilterState, Query, SortState } from '../core/types';
 import { getRowId as defaultGetRowId } from '../core/values';
 import { buildEntries, type RowEntry, type RowId } from './rowModel';
-import type { TableAction } from './tableReducer';
 import { useServerFetch } from './useServerFetch';
 import { type Selection, useSelection } from './useSelection';
-import { DEFAULT_DEBOUNCE_MS, type TableActions, useTableState } from './useTableState';
+import { type ApplyAction, DEFAULT_DEBOUNCE_MS, type TableActions, useTableState } from './useTableState';
+import type { ViewStateProps } from './viewState';
 
 /** Input of `useServerTable`; the server-mode subset of the table props. */
-export type UseServerTableOptions<R> = {
+export type UseServerTableOptions<R> = ViewStateProps & {
   fetchRows: FetchRows<R>;
   /** Should be stable (memoized). */
   columns: readonly Column<R>[];
@@ -76,11 +76,11 @@ function filteredTotal<R>(result: FetchResult<R>): number | null {
 }
 
 /** Moves to the last page when a response says the current page no longer exists. */
-function clampToResult<R>(dispatch: Dispatch<TableAction>, query: Query, result: FetchResult<R>): void {
+function clampToResult<R>(apply: ApplyAction, query: Query, result: FetchResult<R>): void {
   const total = filteredTotal(result);
   if (total === null) return;
   const last = pageCount(total, query.pageSize);
-  if (query.page > last) dispatch({ type: 'page', page: last });
+  if (query.page > last) apply({ type: 'page', page: last });
 }
 
 /** Counter over the server totals; without valid totals it counts the rows up to this page. */
@@ -116,10 +116,10 @@ function useGeneration<R>(options: UseServerTableOptions<R>) {
  * page while ids on other pages stay selected.
  */
 export function useServerTable<R>(options: UseServerTableOptions<R>): ServerTable<R> {
-  const { state, dispatch, actions } = useTableState(options);
+  const { state, apply, actions } = useTableState(options);
   const { generation, retry } = useGeneration(options);
   const query = buildQuery(state, options.columns);
-  const onResult = useCallback((sent: Query, result: FetchResult<R>) => clampToResult(dispatch, sent, result), [dispatch]);
+  const onResult = useCallback((sent: Query, result: FetchResult<R>) => clampToResult(apply, sent, result), [apply]);
   const delay = options.searchDebounceMs ?? DEFAULT_DEBOUNCE_MS;
   const queryKey = JSON.stringify(query);
   const keys = { queryKey, viewKey: `${state.resets}:${queryKey}`, typedKey: typedFiltersKey(query), generation };

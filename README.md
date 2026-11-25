@@ -21,6 +21,7 @@ mounted.
 - [Table props](#table-props)
 - [Filters](#filters)
 - [Search and sorting](#search-and-sorting)
+- [Controlled view state](#controlled-view-state)
 - [Server mode](#server-mode)
 - [Selection](#selection)
 - [Export](#export)
@@ -210,7 +211,28 @@ or the load error has the class `btt-empty-row` instead.
 | `pageSize` | `100` | Initial page size. Changing the prop resyncs the table. |
 | `pageSizeOptions` | `[25, 50, 100, 500]` | Choices of the page-size select; positive whole numbers only. The current size is added when missing. |
 | `toolbarExtras` | – | Your own content (buttons, badges) placed at the end of the toolbar. |
-| `resetKey` | – | Change it to clear search and filters (filters go back to their `defaultValue`) and return to page 1. Sort and page size stay. |
+| `resetKey` | – | Change it to put search and filters back to their defaults (`defaultSearchValue`, `defaultFilters` over the columns' `defaultValue`) and return to page 1. Sort and page size stay. The changes go to the callbacks below. |
+
+### View state (controlled or uncontrolled)
+
+See [Controlled view state](#controlled-view-state). A defined value prop controls that piece;
+each callback fires on every change the table makes, controlled or not.
+
+| Prop | Default | Meaning |
+| --- | --- | --- |
+| `searchValue` | – | Controlled applied search text (the debounced value, not each keystroke). |
+| `defaultSearchValue` | `''` | Initial search text when uncontrolled; also what `resetKey` returns to. |
+| `onSearchChange` | – | `(text) => void` when a search applies (after the debounce, or at once on clear). |
+| `filters` | – | Controlled filter values, `{ [columnKey]: value }` (`FilterState`). |
+| `defaultFilters` | – | Initial filter values, merged over the columns' `filter.defaultValue`; also what `resetKey` returns to. |
+| `onFiltersChange` | – | `(filters) => void` with the whole new `FilterState`. |
+| `sort` | – | Controlled sort, `{ key, direction }`, or `null` for a controlled "unsorted". |
+| `defaultSort` | `null` | Initial sort when uncontrolled. |
+| `onSortChange` | – | `(sort) => void` with the next sort of the cycle (`null` = unsorted). |
+| `page` | – | Controlled 1-based page. |
+| `defaultPage` | `1` | Initial page when uncontrolled. |
+| `onPageChange` | – | `(page) => void`, including the moves to page 1 of the reset rules and page clamping. |
+| `onPageSizeChange` | – | `(size) => void` when the page-size select changes (`pageSize` itself resyncs, see above). |
 
 ### Export
 
@@ -289,7 +311,8 @@ How client mode matches (against the column's `value`, default `row[key]`):
   when the value is an array; `multiselect` matches when any chosen option matches.
 - `notEmpty` keeps rows whose value is not `null`, `undefined`, blank text or `[]`.
 
-`defaultValue`s apply once at mount and again on `resetKey`. Changing the identity of
+`defaultValue`s (and the `defaultFilters` prop over them) apply once at mount and again on
+`resetKey`. Changing the identity of
 `columns` does not clear active filters. A filter change returns to page 1.
 
 ## Search and sorting
@@ -303,6 +326,50 @@ searchable too. A search change returns to page 1.
 descending → unsorted. Empty values sort last in both directions, numbers numerically,
 dates by time, text with a natural, case-insensitive collator (`item 2` before `item 10`).
 The sort is stable and does not change the page.
+
+## Controlled view state
+
+Search, filters, sort and page can each be controlled (`searchValue`, `filters`, `sort`,
+`page`) or left to the table (`defaultSearchValue`, `defaultFilters`, `defaultSort`,
+`defaultPage`), in client and server mode alike.
+
+```tsx
+const [sort, setSort] = useState<SortState>(null);
+const [page, setPage] = useState(1);
+
+<BTTable columns={columns} fetchRows={fetchRows} sort={sort} onSortChange={setSort} page={page} onPageChange={setPage} />;
+```
+
+- **Controlled props win.** The table renders the prop and only proposes changes through the
+  callback; a parent that ignores a proposal keeps the table where it was (server mode sends no
+  request), and the same proposal is made again on the next click. A rejected search is
+  reported once; the debounce does not propose it again.
+- **Reset rules report too.** A new search, a filter change or a page-size change goes to
+  page 1, and so does a search or filters value changed by the parent; each such move calls
+  `onPageChange(1)` once. When the parent's own change (search, filters, `pageSize`,
+  `resetKey`) moves a controlled page, page 1 shows at once, before the parent answers, so
+  server mode asks for page 1 straight away. That held page ends when the `page` prop changes
+  or with the table's next change. Page clamping (client: fewer rows; server: a smaller
+  reported total) calls `onPageChange` with the last page. `resetKey` calls `onSearchChange`,
+  `onFiltersChange` and `onPageChange` with the reset values. A changed `pageSize` prop calls
+  `onPageChange(1)`, not `onPageSizeChange`.
+- **Search is controlled after the debounce.** The box shows what is typed; `onSearchChange`
+  fires once the typing settles, and `searchValue` is the applied term. A new `searchValue`
+  from the parent replaces the box text and goes to page 1. An echo does not: the table
+  remembers the last 10 values it reported and not yet heard back, so a late echo (a URL
+  round trip), even of an older value, never eats keystrokes typed meanwhile or resets the
+  page. Filters work the same way. A value the parent chooses itself clears that memory.
+- **Echoing is safe.** Callbacks run in event handlers, timers or effects, never during render,
+  so `onSortChange={setSort}` is fine. An equal new object counts as no change: `sort={{ key,
+  direction }}` inline, or filters rebuilt on every render (array values such as a
+  multiselect's compare item by item, so `{ status: params.getAll('status') }` is fine). In
+  server mode an echoing parent costs exactly one request per change, and so does a parent
+  change under a controlled page.
+- **`resetKey` with controlled search or filters.** Reset your own controlled search and
+  filters in the same update as `resetKey` when you can: if the parent only echoes the
+  reported reset values afterwards, server mode first sends a request with the old search and
+  filters (already on page 1) and then, aborting it, the reset one.
+- **`onStateChange`** (client) still reports the applied state and the filtered rows.
 
 ## Server mode
 
@@ -369,8 +436,8 @@ Behaviour:
   a full page offers one more page after it.
 - **Refresh and reset.** A new `fetchRows` identity does not refetch; change `refreshKey` to
   send the current query again (for example after an edit, or when the fetcher captures a new
-  tenant id); the scroll position is kept. `resetKey` clears search and filters, goes to
-  page 1 and sends one request.
+  tenant id); the scroll position is kept. `resetKey` puts search and filters back to their
+  defaults, goes to page 1 and sends one request.
 - **Invalid rows.** Entries of `rows` that are `null` or not objects are skipped, with one
   development warning per response.
 - **Pagination is always on.** `pagination={false}` is ignored (development warning).

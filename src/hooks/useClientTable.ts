@@ -5,7 +5,8 @@ import { buildEntries, filterEntries, type RowEntry, type RowId, type RowSource,
 import type { TableState } from './tableReducer';
 import { useLatest } from './useLatest';
 import { type Selection, useSelection } from './useSelection';
-import { type TableActions, useTableState } from './useTableState';
+import { type ApplyAction, type TableActions, useTableState } from './useTableState';
+import type { ViewStateProps } from './viewState';
 
 /** What `onStateChange` receives: the applied state plus every filtered, sorted row. */
 export type ClientTableState<R> = {
@@ -18,7 +19,7 @@ export type ClientTableState<R> = {
 };
 
 /** Input of `useClientTable`; the client-mode subset of the table props. */
-export type UseClientTableOptions<R> = {
+export type UseClientTableOptions<R> = ViewStateProps & {
   /** An array, or an object map whose keys are the id fallback. */
   rows: RowSource<R>;
   /** Should be stable (memoized): a new array re-filters and re-sorts every row. */
@@ -90,17 +91,27 @@ function useFilteredRows<R>(options: UseClientTableOptions<R>, state: TableState
 }
 
 /**
+ * Moves the state to the page on screen when clamping changed it, after commit, so a
+ * controlled page hears of it through `onPageChange`. Runs again only when either page changes.
+ */
+function useClampReport(page: number, statePage: number, apply: ApplyAction): void {
+  useEffect(() => {
+    if (page !== statePage) apply({ type: 'page', page });
+  }, [page, statePage, apply]);
+}
+
+/**
  * Client-mode table state: debounced search, filters (defaults applied once and on
  * `resetKey`), the asc → desc → none sort cycle, paging with reset-to-1 and clamping, the
  * derived filtered → sorted → paged rows, row selection and `onStateChange`.
  */
 export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTable<R> {
-  const { state, dispatch, actions } = useTableState(options);
+  const { state, apply, actions } = useTableState(options);
   const { entries, sorted } = useFilteredRows(options, state);
 
   const size = options.pagination === false ? 0 : state.pageSize;
   const page = clampPage(state.page, sorted.length, size);
-  if (page !== state.page) dispatch({ type: 'page', page });
+  useClampReport(page, state.page, apply);
   const pageRows = useMemo(() => paginate(sorted, page, size), [sorted, page, size]);
 
   const filteredRows = useMemo(() => sorted.map((entry) => entry.row), [sorted]);
