@@ -64,7 +64,7 @@ export type TableHeadProps<R> = {
 export function TableHead<R>({ columns, sort, onSort, selectable }: TableHeadProps<R>) {
   return (
     <thead className="btt-thead" style={STICKY}>
-      <tr>
+      <tr aria-rowindex={1}>
         {selectable && <th scope="col" className="btt-th btt-th--select" />}
         {columns.map((column) => (
           <HeaderCell key={column.key} column={column} sort={sort} onSort={onSort} />

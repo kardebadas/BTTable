@@ -1,5 +1,6 @@
 import { type HTMLAttributes, isValidElement, memo, type ReactNode } from 'react';
 import type { Column } from '../core/types';
+import type { VirtualWindow } from '../core/virtual';
 import { formatValue, getColumnValue } from '../core/values';
 import type { RowEntry } from '../hooks/rowModel';
 import { alignClass, cx } from './classNames';
@@ -32,7 +33,7 @@ function cellClass<R>(column: Column<R>, row: R): string | undefined {
 type RowProps<R> = RowCallbacks<R> & {
   entry: RowEntry<R>;
   columns: readonly Column<R>[];
-  /** Position on screen, 0-based: drives the odd/even class. */
+  /** Index in the whole list, 0-based: drives the odd/even class and `aria-rowindex` (the header row is 1). */
   position: number;
   selectable: boolean;
 };
@@ -42,7 +43,7 @@ function Row<R>({ entry, columns, position, selectable, rowClassName, rowProps }
   const parity = position % 2 === 0 ? 'btt-row--odd' : 'btt-row--even';
   const className = cx('btt-row', parity, rowClassName?.(entry.row, entry.index), attributes.className);
   return (
-    <tr {...attributes} className={className}>
+    <tr {...attributes} className={className} aria-rowindex={position + 2}>
       {selectable && <td className="btt-cell btt-cell--select" />}
       {columns.map((column) => (
         <td key={column.key} className={cx('btt-cell', alignClass(column.align), cellClass(column, entry.row))}>
@@ -63,15 +64,28 @@ export type TableBodyProps<R> = RowCallbacks<R> & {
   selectable: boolean;
   loading: boolean;
   emptyMessage: ReactNode;
+  /** The entries to mount, `[start, end)`, and the spacer heights around them. Default: every entry. */
+  range?: VirtualWindow;
 };
 
+/** Stands in for unmounted rows: one cell spanning every column, no widths, hidden from assistive technology. */
+function Spacer({ height, colSpan }: { height: number; colSpan: number }) {
+  if (height <= 0) return null;
+  return (
+    <tr className="btt-spacer" aria-hidden="true" style={{ height }}>
+      <td colSpan={colSpan} style={{ padding: 0, border: 0 }} />
+    </tr>
+  );
+}
+
 /**
- * The `<tbody>`: one memoized row per entry, keyed by row id, or the empty message
- * (hidden while loading). Driven by a list of `RowEntry`, whatever the data source.
+ * The `<tbody>`: one memoized row per mounted entry, keyed by row id, between the spacers
+ * of `range`, or the empty message (hidden while loading). Driven by a list of
+ * `RowEntry`, whatever the data source.
  */
-export function TableBody<R>({ entries, columns, selectable, loading, emptyMessage, ...callbacks }: TableBodyProps<R>) {
+export function TableBody<R>({ entries, columns, selectable, loading, emptyMessage, range, ...callbacks }: TableBodyProps<R>) {
+  const colSpan = columns.length + (selectable ? 1 : 0);
   if (entries.length === 0) {
-    const colSpan = columns.length + (selectable ? 1 : 0);
     return (
       <tbody>
         {!loading && (
@@ -84,18 +98,21 @@ export function TableBody<R>({ entries, columns, selectable, loading, emptyMessa
       </tbody>
     );
   }
+  const { start = 0, end = entries.length, padTop = 0, padBottom = 0 } = range ?? {};
   return (
     <tbody>
-      {entries.map((entry, position) => (
+      <Spacer height={padTop} colSpan={colSpan} />
+      {entries.slice(start, end).map((entry, offset) => (
         <MemoRow
           key={entry.id}
           entry={entry}
           columns={columns}
-          position={position}
+          position={start + offset}
           selectable={selectable}
           {...callbacks}
         />
       ))}
+      <Spacer height={padBottom} colSpan={colSpan} />
     </tbody>
   );
 }

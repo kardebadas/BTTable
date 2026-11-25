@@ -70,6 +70,10 @@ describe('layout', () => {
     expect(scroll.style.maxHeight).toBe('600px');
     expect(scroll.querySelector('table')).toHaveClass('btt-table');
     expect(table(container).style.tableLayout).toBe('fixed');
+    expect(table(container).style.borderCollapse).toBe('collapse');
+    expect(table(container)).toHaveAttribute('aria-rowcount', '4');
+    expect(container.querySelector('thead tr')).toHaveAttribute('aria-rowindex', '1');
+    expect(bodyRows(container).map((row) => row.getAttribute('aria-rowindex'))).toEqual(['2', '3', '4']);
     expect(table(container).style.width).toBe('100%');
   });
 

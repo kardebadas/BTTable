@@ -1,23 +1,30 @@
-import { type ErrorInfo, type ReactNode, useEffect } from 'react';
+import { type ErrorInfo, type ReactNode, useEffect, useRef } from 'react';
 import { cx } from './components/classNames';
 import { ColGroup, tableMinWidth, toCssSize } from './components/ColGroup';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { type RowCallbacks, TableBody } from './components/TableBody';
 import { TableHead } from './components/TableHead';
 import type { Column, FetchRows, SortState } from './core/types';
+import { shouldVirtualize, type VirtualizeMode } from './core/virtual';
 import type { RowEntry, RowId } from './hooks/rowModel';
 import { type ClientTableState, useClientTable } from './hooks/useClientTable';
+import { useVirtualRows } from './hooks/useVirtualRows';
 import { type BTTableLabels, DEFAULT_LABELS } from './labels';
 
 /** Props of `BTTable`. Pass exactly one of `rows` (client mode) or `fetchRows` (server mode). */
 export type BTTableProps<R> = RowCallbacks<R> & {
-  /** Should be stable (memoized): a new array re-derives and re-renders every row. */
+  /**
+   * Should be stable (memoized): a new array re-derives and re-renders every row, and
+   * scrolls the table back to the top, on every parent render.
+   */
   columns: readonly Column<R>[];
+  /** Should be stable (memoized): a new array is new data, so the table scrolls back to the top on every parent render. */
   rows?: readonly R[];
   fetchRows?: FetchRows<R>;
   /**
    * Default: `row.id ?? row.ID ?? row.INDEX ?? row.N_ID`, else the index. Selection needs
-   * stable ids. Should be stable (memoized): a new function re-derives every row.
+   * stable ids. Should be stable (memoized): a new function re-derives every row and
+   * scrolls the table back to the top on every parent render.
    */
   getRowId?: (row: R, index: number) => RowId;
   pagination?: boolean;
@@ -29,8 +36,14 @@ export type BTTableProps<R> = RowCallbacks<R> & {
   selectedIds?: readonly RowId[];
   defaultSelectedIds?: readonly RowId[];
   onSelectionChange?: (ids: RowId[]) => void;
-  /** Number px or CSS size; `'none'` turns the inner vertical scroll off. Default 600. */
+  /** Number px or CSS size; `'none'` turns the inner vertical scroll and virtualization off. Default 600. */
   maxHeight?: number | string;
+  /** Mount only the rows near the viewport: `'auto'` (default) above `virtualizeThreshold` rows, `true`, `false`. */
+  virtualize?: VirtualizeMode;
+  /** Row count above which `virtualize: 'auto'` turns on. Default 100. */
+  virtualizeThreshold?: number;
+  /** Px assumed for a row until it is measured; real heights replace it. Default 40. */
+  estimatedRowHeight?: number;
   loading?: boolean;
   emptyMessage?: ReactNode;
   /** Visually hidden table caption, for assistive technology. */
@@ -84,11 +97,33 @@ function useInvalidRowWarning(rows: readonly unknown[], validCount: number): voi
   }, [rows, skipped]);
 }
 
-function TableView<R>(props: ViewProps<R>) {
+const DEFAULT_ROW_HEIGHT = 40;
+
+/** The `estimatedRowHeight` prop, or the default when it is missing, not finite or not positive. */
+function rowEstimate(estimatedRowHeight: number | undefined): number {
+  const valid = estimatedRowHeight !== undefined && Number.isFinite(estimatedRowHeight) && estimatedRowHeight > 0;
+  return valid ? estimatedRowHeight : DEFAULT_ROW_HEIGHT;
+}
+
+/** Virtualization per the `maxHeight` / `virtualize` / `virtualizeThreshold` / `estimatedRowHeight` props. */
+function useTableVirtualization<R>(props: ViewProps<R>) {
+  const { entries, maxHeight = 600, virtualize = 'auto', virtualizeThreshold = 100 } = props;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const enabled = shouldVirtualize({ virtualize, maxHeight, rowCount: entries.length, threshold: virtualizeThreshold });
+  const estimatedRowHeight = rowEstimate(props.estimatedRowHeight);
+  const range = useVirtualRows({ entries, enabled, estimatedRowHeight, scrollRef });
+  return { scrollRef, enabled, range, maxHeight };
+}
+
+/** The scroll container and the table: fixed layout, sticky header, rows virtualized when on. */
+function TableScroll<R>(props: ViewProps<R>) {
   const { columns, entries, labels, selectable = false, loading = false, emptyMessage = 'No records found' } = props;
-  const tableStyle = { tableLayout: 'fixed', width: '100%', minWidth: tableMinWidth(columns, selectable) } as const;
+  const { scrollRef, enabled, range, maxHeight } = useTableVirtualization(props);
+  // Collapsed borders: no border-spacing between rows, so rows sit exactly at their measured offsets.
+  const tableStyle = { tableLayout: 'fixed', borderCollapse: 'collapse', width: '100%', minWidth: tableMinWidth(columns, selectable) } as const;
   // A stable gutter keeps the vertical scrollbar from taking width from the columns when it appears.
-  const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(props.maxHeight ?? 600) } as const;
+  // Virtualization keeps the view anchored itself, so the browser's scroll anchoring must not also adjust it.
+  const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(maxHeight), overflowAnchor: enabled ? 'none' : undefined } as const;
   const bodyFallback = (
     <tbody>
       <tr>
@@ -99,28 +134,36 @@ function TableView<R>(props: ViewProps<R>) {
     </tbody>
   );
   return (
+    <div className="btt-scroll" style={scrollStyle} ref={scrollRef}>
+      <table className="btt-table" style={tableStyle} aria-busy={loading} aria-rowcount={entries.length + 1}>
+        {props.caption !== undefined && <caption className="btt-caption">{props.caption}</caption>}
+        <ColGroup columns={columns} selectable={selectable} />
+        <TableHead columns={columns} sort={props.sort} onSort={props.onSort} selectable={selectable} />
+        <ErrorBoundary fallback={bodyFallback} onError={props.onError} resetKey={entries}>
+          <TableBody
+            entries={entries}
+            columns={columns}
+            selectable={selectable}
+            loading={loading}
+            emptyMessage={emptyMessage}
+            range={range}
+            rowClassName={props.rowClassName}
+            rowProps={props.rowProps}
+          />
+        </ErrorBoundary>
+      </table>
+    </div>
+  );
+}
+
+function TableView<R>(props: ViewProps<R>) {
+  const loading = props.loading ?? false;
+  return (
     <>
       <div className={cx('btt-status', loading && 'btt-status--loading')} style={STATUS_STYLE} role="status" aria-live="polite">
-        {loading ? labels.loading : null}
+        {loading ? props.labels.loading : null}
       </div>
-      <div className="btt-scroll" style={scrollStyle}>
-        <table className="btt-table" style={tableStyle} aria-busy={loading}>
-          {props.caption !== undefined && <caption className="btt-caption">{props.caption}</caption>}
-          <ColGroup columns={columns} selectable={selectable} />
-          <TableHead columns={columns} sort={props.sort} onSort={props.onSort} selectable={selectable} />
-          <ErrorBoundary fallback={bodyFallback} onError={props.onError} resetKey={entries}>
-            <TableBody
-              entries={entries}
-              columns={columns}
-              selectable={selectable}
-              loading={loading}
-              emptyMessage={emptyMessage}
-              rowClassName={props.rowClassName}
-              rowProps={props.rowProps}
-            />
-          </ErrorBoundary>
-        </table>
-      </div>
+      <TableScroll {...props} />
     </>
   );
 }
