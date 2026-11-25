@@ -6,7 +6,8 @@ export function pageCount(totalRows: number, pageSize: number): number {
   return Math.max(1, Math.ceil(total / size));
 }
 
-function clampPage(page: number, totalRows: number, pageSize: number): number {
+/** A 1-based page coerced to an integer and clamped into `1..pageCount(totalRows, pageSize)`. */
+export function clampPage(page: number, totalRows: number, pageSize: number): number {
   const last = pageCount(totalRows, pageSize);
   return Math.min(Math.max(1, Math.floor(Number(page)) || 1), last);
 }
