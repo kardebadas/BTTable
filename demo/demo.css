@@ -1,0 +1,135 @@
+/* Demo page only; the table itself is styled by src/styles.css. */
+
+:root {
+  --page-bg: #f3f6f9;
+  --page-fg: #1d2733;
+  --page-muted: #5a6876;
+  --page-line: #d8e0e8;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --page-bg: #0d1013;
+    --page-fg: #e2e8ee;
+    --page-muted: #9aa8b6;
+    --page-line: #2d3640;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --page-bg: #0d1013;
+  --page-fg: #e2e8ee;
+  --page-muted: #9aa8b6;
+  --page-line: #2d3640;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--page-fg);
+  background: var(--page-bg);
+}
+
+.demo {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.demo-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 16px;
+}
+
+.demo-header h1 {
+  margin: 0 auto 0 0;
+  font-size: 1.25rem;
+}
+
+.demo-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.demo-tabs button,
+.demo-bar button {
+  padding: 6px 14px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid var(--page-line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.demo-tabs button[aria-selected='true'] {
+  color: #fff;
+  background: #064b8f;
+  border-color: #064b8f;
+}
+
+.demo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.demo-bar,
+.demo-widths {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  color: var(--page-muted);
+}
+
+.demo-widths {
+  margin-left: auto;
+}
+
+.demo-ok {
+  color: #1a7f37;
+}
+
+.demo-bad {
+  font-weight: 700;
+  color: #c42b1c;
+}
+
+.demo-tag {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  opacity: 0.8;
+}
+
+.demo-selected {
+  color: var(--page-muted);
+}
+
+.demo-query pre {
+  overflow: auto;
+  padding: 8px;
+  font-size: 12px;
+  border: 1px solid var(--page-line);
+  border-radius: 6px;
+}
+
+.demo-bar button {
+  padding: 3px 10px;
+}
+
+.demo-bar button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

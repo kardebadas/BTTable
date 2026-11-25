@@ -1,1 +1,599 @@
-/* @kardebadas/bttable styles: every selector is prefixed .btt-, themed through --btt-* custom properties on .btt. */
+/*
+ * @kardebadas/bttable stylesheet. Every selector is prefixed .btt-.
+ *
+ * Theme through the --btt-* custom properties below; set any of them on `.btt` (or on a
+ * class you pass as `className`). Defaults sit inside :where(), so a plain `.btt { ... }`
+ * rule of yours wins. Dark values follow `prefers-color-scheme`; `className="btt-theme-light"`
+ * or `"btt-theme-dark"` forces one scheme. Never set widths on cells: column widths come
+ * from the table's <colgroup> only.
+ */
+
+:where(.btt) {
+  --btt-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --btt-font-size: 0.875rem;
+  --btt-bg: #ffffff;
+  --btt-fg: #1d2733;
+  --btt-surface: #f5f8fb;
+  --btt-border: #d8e0e8;
+  --btt-border-strong: #aebbc8;
+  --btt-header-bg: #064b8f;
+  --btt-header-fg: #ffffff;
+  --btt-row-alt: #eef5fc;
+  --btt-row-hover: #dcebfa;
+  --btt-accent: #0b6bcb;
+  --btt-danger: #c42b1c;
+  --btt-muted: #5a6876;
+  --btt-radius: 6px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :where(.btt:not(.btt-theme-light)) {
+    --btt-bg: #14181d;
+    --btt-fg: #e2e8ee;
+    --btt-surface: #1b2027;
+    --btt-border: #2d3640;
+    --btt-border-strong: #45525f;
+    --btt-header-bg: #0f3a64;
+    --btt-header-fg: #eaf2fb;
+    --btt-row-alt: #1a2028;
+    --btt-row-hover: #22303f;
+    --btt-accent: #5ea8f0;
+    --btt-danger: #ff7b6e;
+    --btt-muted: #9aa8b6;
+    color-scheme: dark;
+  }
+}
+
+:where(.btt.btt-theme-dark) {
+  --btt-bg: #14181d;
+  --btt-fg: #e2e8ee;
+  --btt-surface: #1b2027;
+  --btt-border: #2d3640;
+  --btt-border-strong: #45525f;
+  --btt-header-bg: #0f3a64;
+  --btt-header-fg: #eaf2fb;
+  --btt-row-alt: #1a2028;
+  --btt-row-hover: #22303f;
+  --btt-accent: #5ea8f0;
+  --btt-danger: #ff7b6e;
+  --btt-muted: #9aa8b6;
+  color-scheme: dark;
+}
+
+/* Root and status strip */
+
+.btt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--btt-font);
+  font-size: var(--btt-font-size);
+  line-height: 1.45;
+  color: var(--btt-fg);
+}
+
+.btt *,
+.btt *::before,
+.btt *::after {
+  box-sizing: border-box;
+}
+
+.btt-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--btt-muted);
+}
+
+.btt-status--loading::before {
+  content: '';
+  flex: none;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid var(--btt-border);
+  border-top-color: var(--btt-accent);
+  border-radius: 50%;
+}
+
+/* Shared controls */
+
+.btt-search-input,
+.btt-filter-input,
+.btt-filter-select,
+.btt-multiselect-button,
+.btt-multiselect-search,
+.btt-page-input,
+.btt-page-size select,
+.btt-export,
+.btt-retry,
+.btt-page-prev,
+.btt-page-next {
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--btt-fg);
+  background-color: var(--btt-bg);
+  border: 1px solid var(--btt-border-strong);
+  border-radius: var(--btt-radius);
+}
+
+.btt-export,
+.btt-retry,
+.btt-page-prev,
+.btt-page-next {
+  padding-inline: 12px;
+  font-weight: 500;
+  background-color: var(--btt-surface);
+  cursor: pointer;
+}
+
+.btt-export:hover,
+.btt-retry:hover,
+.btt-page-prev:hover:not(:disabled),
+.btt-page-next:hover:not(:disabled),
+.btt-multiselect-button:hover {
+  border-color: var(--btt-accent);
+}
+
+.btt-page-prev:disabled,
+.btt-page-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btt ::placeholder {
+  color: var(--btt-muted);
+  opacity: 1;
+}
+
+.btt input[type='checkbox'] {
+  accent-color: var(--btt-accent);
+}
+
+.btt :focus-visible {
+  outline: 2px solid var(--btt-accent);
+  outline-offset: 1px;
+}
+
+/* Toolbar */
+
+.btt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.btt-search {
+  position: relative;
+  flex: 1 1 14rem;
+  max-width: 24rem;
+}
+
+.btt-search-input {
+  width: 100%;
+  padding-right: 32px;
+}
+
+.btt-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font: inherit;
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--btt-muted);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.btt-search-clear:hover {
+  color: var(--btt-fg);
+  background-color: var(--btt-row-hover);
+}
+
+.btt-counter {
+  margin-right: auto;
+  color: var(--btt-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.btt-exports,
+.btt-toolbar-extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Filters panel (its grid template is set inline) */
+
+.btt-filters {
+  gap: 10px 12px;
+  padding: 10px 12px;
+  background-color: var(--btt-surface);
+  border: 1px solid var(--btt-border);
+  border-radius: var(--btt-radius);
+}
+
+.btt-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.btt-filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--btt-muted);
+  overflow-wrap: anywhere;
+}
+
+.btt-filter-input,
+.btt-filter-select,
+.btt-multiselect-button {
+  width: 100%;
+  min-width: 0;
+}
+
+.btt-filter-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.btt-filter-range .btt-filter-input {
+  flex: 1 1 6.5rem;
+  width: auto;
+}
+
+.btt-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+/* Multi-select */
+
+.btt-multiselect {
+  position: relative;
+}
+
+.btt-multiselect-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.btt-multiselect-button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btt-multiselect-button::after {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: -3px 2px 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.btt-multiselect-button[aria-expanded='true']::after {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.btt-multiselect-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  background-color: var(--btt-bg);
+  border: 1px solid var(--btt-border-strong);
+  border-radius: var(--btt-radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.btt-multiselect-search {
+  width: 100%;
+}
+
+.btt-multiselect-list {
+  max-height: 15rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border-radius: calc(var(--btt-radius) - 2px);
+}
+
+.btt-multiselect-list:focus-visible {
+  outline-offset: -2px;
+}
+
+.btt-multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: calc(var(--btt-radius) - 2px);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  user-select: none;
+}
+
+.btt-multiselect-option input {
+  flex: none;
+  margin: 0;
+  pointer-events: none;
+}
+
+.btt-multiselect-option:hover,
+.btt-multiselect-option--active {
+  background-color: var(--btt-row-hover);
+}
+
+.btt-multiselect-empty {
+  padding: 5px 8px;
+  color: var(--btt-muted);
+}
+
+/* Table */
+
+.btt-scroll {
+  background-color: var(--btt-bg);
+  border: 1px solid var(--btt-border);
+  border-radius: var(--btt-radius);
+}
+
+.btt-table {
+  font-size: inherit;
+}
+
+.btt-caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.btt-th {
+  padding: 8px 10px;
+  font-weight: 600;
+  text-align: left;
+  vertical-align: bottom;
+  color: var(--btt-header-fg);
+  background-color: var(--btt-header-bg);
+  overflow-wrap: anywhere;
+  /* The header is sticky and a collapsed table's borders scroll away, so its lines are shadows. */
+  border: 0;
+  box-shadow: inset -1px 0 rgb(255 255 255 / 0.12);
+}
+
+.btt-th:last-child {
+  box-shadow: none;
+}
+
+.btt-th--select,
+.btt-cell--select {
+  padding-inline: 0;
+  text-align: center;
+}
+
+.btt-th--select {
+  vertical-align: middle;
+}
+
+.btt-sort {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  text-align: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.btt-sort:focus-visible {
+  outline-color: var(--btt-header-fg);
+  outline-offset: 2px;
+}
+
+.btt-align-center .btt-sort {
+  justify-content: center;
+}
+
+.btt-align-right .btt-sort {
+  justify-content: flex-end;
+}
+
+.btt-sort-icon {
+  flex: none;
+  fill: currentColor;
+}
+
+.btt-caret-up,
+.btt-caret-down {
+  opacity: 0.35;
+}
+
+.btt-sort:hover .btt-caret-up,
+.btt-sort:hover .btt-caret-down {
+  opacity: 0.6;
+}
+
+.btt-th[aria-sort='ascending'] .btt-caret-up,
+.btt-th[aria-sort='descending'] .btt-caret-down {
+  opacity: 1;
+}
+
+.btt-cell {
+  padding: 6px 10px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--btt-border);
+}
+
+/* Only the colour of the last line goes, so the row keeps its measured height. */
+.btt-table tbody tr:last-child > td {
+  border-bottom-color: transparent;
+}
+
+.btt-select {
+  margin: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+/* Row boxes sit on the first text line, however tall the row is. */
+.btt-cell--select .btt-select {
+  margin-top: 3px;
+}
+
+.btt-align-center {
+  text-align: center;
+}
+
+.btt-align-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.btt-row--even {
+  background-color: var(--btt-row-alt);
+}
+
+.btt-row:hover {
+  background-color: var(--btt-row-hover);
+}
+
+.btt-row:has(> .btt-cell--select .btt-select:checked) {
+  background-color: color-mix(in srgb, var(--btt-accent) 16%, var(--btt-bg));
+}
+
+.btt-row--empty:hover {
+  background-color: transparent;
+}
+
+.btt-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--btt-muted);
+}
+
+/* Errors */
+
+.btt-error {
+  color: var(--btt-danger);
+}
+
+div.btt-error,
+td.btt-error {
+  padding: 12px 16px;
+  background-color: color-mix(in srgb, var(--btt-danger) 10%, var(--btt-bg));
+  border-radius: var(--btt-radius);
+}
+
+.btt-retry {
+  margin-left: 8px;
+}
+
+/* Pagination */
+
+.btt-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 10px;
+}
+
+.btt-page,
+.btt-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--btt-muted);
+}
+
+.btt-page-input {
+  width: 4.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.btt-page-size select {
+  cursor: pointer;
+}
+
+/* Loading dims the rows; motion only when the user has not asked for less. */
+
+.btt-table[aria-busy='true'] tbody {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .btt-status--loading::before {
+    animation: btt-spin 0.8s linear infinite;
+  }
+
+  .btt-table tbody {
+    transition: opacity 0.15s ease;
+  }
+
+  .btt-row,
+  .btt-export,
+  .btt-retry,
+  .btt-page-prev,
+  .btt-page-next,
+  .btt-multiselect-button {
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+  }
+}
+
+@keyframes btt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
