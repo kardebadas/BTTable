@@ -8,9 +8,10 @@
     "strict": true,
     "declaration": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "demo", "vitest.setup.ts", "*.config.ts"]
+  "include": ["src", "demo", "bench", "vitest.setup.ts", "*.config.ts"]
 }
