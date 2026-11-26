@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clampPage, pageCount, paginate } from '../core/pagination';
 import type { Column, FilterState, SortState } from '../core/types';
 import { buildEntries, type RowEntry, type RowId, type RowSource } from './rowModel';
@@ -67,6 +67,8 @@ export type ClientTable<R> = TableActions & {
   selection: Selection<R>;
   /** Expanded detail rows; ids of rows gone from `rows` are pruned like selected ids. */
   expansion: Expansion;
+  /** Starts building the search texts in the background (the search box got focus). */
+  warmSearch: () => void;
 };
 
 /** `ClientTableState` with the filtered entries instead of their rows, which are listed only when reported. */
@@ -97,14 +99,16 @@ function useStateChange<R>(state: ReportedState<R>, onStateChange?: (state: Clie
 }
 
 /**
- * True from the first render whose search box text or applied search is not blank, and
- * from then on: a table nobody searches never builds its search texts.
+ * True from the first render whose search box text or applied search is not blank, or once
+ * `warm` is called (the search box got focus), and from then on: a table nobody searches
+ * never builds its search texts.
  */
-function useSearchUsed(state: TableState): boolean {
+function useSearchUsed(state: TableState): { used: boolean; warm: () => void } {
   const [used, setUsed] = useState(false);
+  const warm = useCallback(() => setUsed(true), []);
   const active = state.searchInput.trim() !== '' || state.search.trim() !== '';
   if (active && !used) setUsed(true);
-  return used || active;
+  return { used: used || active, warm };
 }
 
 /**
@@ -129,12 +133,13 @@ function useFilteredRows<R>(options: UseClientTableOptions<R>, state: TableState
   const { rows, columns, getRowId } = options;
   const entries = useMemo(() => buildEntries(rows, getRowId), [rows, getRowId]);
   const index = useMemo(() => new RowIndex(entries, columns), [entries, columns]);
-  useWarmSearch(index, useSearchUsed(state));
+  const { used, warm } = useSearchUsed(state);
+  useWarmSearch(index, used);
   const { search, filters, sort } = state;
   const searched = useMemo(() => index.search(search), [index, search]);
   const filtered = useMemo(() => index.filter(searched, filters), [index, searched, filters]);
   const sorted = useMemo(() => index.sort(filtered, sort), [index, filtered, sort]);
-  return { entries, sorted };
+  return { entries, sorted, warmSearch: warm };
 }
 
 /**
@@ -154,7 +159,7 @@ function useClampReport(page: number, statePage: number, apply: ApplyAction): vo
  */
 export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTable<R> {
   const { state, apply, actions } = useTableState(options);
-  const { entries, sorted } = useFilteredRows(options, state);
+  const { entries, sorted, warmSearch } = useFilteredRows(options, state);
 
   const size = options.pagination === false ? 0 : state.pageSize;
   const page = clampPage(state.page, sorted.length, size);
@@ -186,5 +191,6 @@ export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTabl
     pageRows,
     selection,
     expansion,
+    warmSearch,
   };
 }

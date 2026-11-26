@@ -4,7 +4,19 @@ import { filterRows } from '../core/filters';
 import { matchesSearch } from '../core/search';
 import type { Column, FilterState, SortState } from '../core/types';
 import { RowIndex } from './rowIndex';
-import { buildEntries, sortEntries } from './rowModel';
+import { compareValues } from '../core/compare';
+import { getColumnValue } from '../core/values';
+import { buildEntries, type RowEntry } from './rowModel';
+
+/** Reference order for `RowIndex.sort`: a stable comparison sort on each row's sort value. */
+function sortEntries<R>(entries: RowEntry<R>[], columns: readonly Column<R>[], sort: SortState): RowEntry<R>[] {
+  const column = sort && columns.find((candidate) => candidate.key === sort.key);
+  if (!sort || !column) return entries;
+  const read = column.sortValue ?? ((row: R) => getColumnValue(column, row));
+  const keyed = entries.map((entry) => ({ entry, key: read(entry.row) }));
+  keyed.sort((a, b) => compareValues(a.key, b.key, sort.direction));
+  return keyed.map((item) => item.entry);
+}
 
 type Row = { id: number; name: string; amount: unknown; when: unknown; tags: string[]; note?: unknown; hidden: string };
 

@@ -16,8 +16,8 @@ type LastSearch<R> = { needle: string; result: RowEntry<R>[] };
  * Per-row values derived once per `entries` × `columns` pair, so a keystroke, filter change
  * or sort click does not recompute them for every row: the lowercase search text, each
  * filter column's `filterKey` and each sort column's dense `sortRanks`. Values are stored by
- * `entry.index` and built on first use. Results match `filterRows` and `sortEntries`
- * exactly, as long as rows and the column functions are pure (React's own memo contract).
+ * `entry.index` and built on first use. Results match `filterRows` and a stable
+ * `compareValues` sort exactly, as long as rows and the column functions are pure (React's own memo contract).
  */
 export class RowIndex<R> {
   private readonly entries: RowEntry<R>[];
@@ -77,7 +77,7 @@ export class RowIndex<R> {
   }
 
   /**
-   * `entries` stably sorted by the sort column (as `sortEntries`) with a counting sort on
+   * `entries` stably sorted by the sort column (as a stable `compareValues` sort) with a counting sort on
    * ranks built once per column, which later sorts reuse in either direction. An unknown
    * sort key leaves the list unchanged.
    */

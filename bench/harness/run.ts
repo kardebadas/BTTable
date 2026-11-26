@@ -35,6 +35,8 @@ const STEPS: [string, Step][] = [
   ['selectAll', steps.selectAll],
   ['profileWheel', (ctx) => (ctx.cdp ? profiled(ctx.cdp, () => steps.wheel(ctx)).then((p) => p.top) : Promise.resolve(null))],
   ['profileSearch', (ctx) => (ctx.cdp ? profiled(ctx.cdp, () => steps.search(ctx)).then((p) => p.top) : Promise.resolve(null))],
+  // Last: it reloads the page.
+  ['searchAfterFocus', steps.searchAfterFocus],
 ];
 
 function options() {

@@ -10,6 +10,8 @@ export type ToolbarSearch = {
   onChange: (text: string) => void;
   /** The clear button: should empty the search and apply it at once. */
   onClear: () => void;
+  /** The search box got focus. */
+  onFocus?: () => void;
 };
 
 /** Props of `Toolbar`; every part is optional and is left out when its prop is. */
@@ -53,7 +55,7 @@ export function formatCounter(counter: CounterData | null, labels: BTTableLabels
   return `${text} ${fillLabel(labels.counterFiltered, { total: count(filteredFrom) })}`;
 }
 
-function SearchBox({ value, placeholder, onChange, onClear, labels }: ToolbarSearch & { labels: BTTableLabels }) {
+function SearchBox({ value, placeholder, onChange, onClear, onFocus, labels }: ToolbarSearch & { labels: BTTableLabels }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const clear = () => {
     onClear();
@@ -69,6 +71,7 @@ function SearchBox({ value, placeholder, onChange, onClear, labels }: ToolbarSea
         placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
       />
       {value !== '' && (
         <button type="button" className="btt-search-clear" aria-label={labels.clearSearch} onClick={clear}>

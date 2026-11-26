@@ -1,8 +1,10 @@
 # Benchmarks
 
 `npm run bench` measures client mode (`rows`, virtualized, no pagination) at 10k, 100k,
-500k and 1M rows in Chrome and Firefox. This file holds the method and the BEFORE baseline
-taken on branch `perf/million-rows` at `0ecc48d`, before any performance change.
+500k and 1M rows in Chrome and Firefox. This file holds the method, the BEFORE baseline
+taken on branch `perf/million-rows` at `0ecc48d` (before any performance change), the AFTER
+run on the same branch with every change applied (`bench/results/after.json`), what changed
+and why, and the limits that remain.
 
 ## Running it
 
@@ -52,10 +54,12 @@ everything else is observed from the DOM or through CDP.
 | drag p50/p95/max | rAF deltas while the scrollbar thumb of `.btt-scroll` is dragged top → bottom in 60 steps, 30 ms apart |
 | header drift px | max change of any `thead th` left/width (viewport px) sampled every frame during wheel / drag |
 | RO cb p95/max | duration of each `ResizeObserver` callback (the library's `applyMeasurements` batches) during the wheel run |
-| offsets pass ms | the `offsetsOf` pass replicated in the page at this `n` (`rows.map(h ?? 40)` + `rowOffsets`), median of 5 |
+| offsets pass ms | **BEFORE:** the `offsetsOf` pass replicated in the page at this `n` (`rows.map(h ?? 40)` + `rowOffsets`), median of 5 — it ran on every measurement. **AFTER** the column holds two numbers, because that pass no longer exists: *per measurement* = one measurement batch on the Fenwick tree (20 `set` + 2 `offset` + 1 `rowAt`, averaged over 1,000 rounds), *per list* = one `buildTree` (heights array + tree, once per new row list: sort, search, filter, new data), each median of 5. Compare BEFORE's single number with AFTER's *per measurement* number (what scrolling pays); *per list* is what a sort or search pays once |
 | max scrollHeight | `.btt-scroll` `scrollHeight` after `scrollTop = scrollHeight` |
 | last row: drag / End key / scrollTop=max / scrollToRow | after the thumb drag, after `End` (a cell is clicked first so the scroller takes keys), after `scrollTop = scrollHeight`, after `handle.scrollToRow(lastId)` — each settled (scroll position steady for 5 frames). ✓ = row N mounted and fully visible, "in DOM" = mounted but not fully visible, ✗ = not mounted, with the id of the last mounted row |
-| search ms | `input` event of pasting `lopes` (one event) → first row changed + painted |
+| search ms (BEFORE) / search first | `input` event of pasting `lopes` (one event) → first row changed + painted. AFTER: pasted right after clicking the box, so the focus warm-up has had no time; the query builds the rest of the search texts |
+| search later | after clearing, pasting `lope` (does not extend `lopes`, so every prebuilt text is scanned) → first row changed + painted |
+| first search after 2 s focus | page reloaded, search box focused, 2 s wait (a user about to type), then the same `lopes` paste |
 | clear ms | `Backspace` over the selected term → first row changed + painted |
 | sort asc/desc ms | click on the Amount sort button → first row changed + painted |
 | select all / none ms | click on the header checkbox → first row's checkbox changed + painted |
@@ -72,6 +76,8 @@ wheel run and a second search, kept in the JSON as the top self-time functions.
 - 60 Hz frame cadence (16.7 ms frames in Chrome, 17.1 ms in Firefox)
 
 ## BEFORE (0ecc48d)
+
+Same machine; Chrome 157 / Firefox 151, single run.
 
 Rendering and scrolling:
 
@@ -102,7 +108,129 @@ Reachability and interactions:
 Single run; frame times are quantized to the 60 Hz cadence, so treat p95 values of one or
 two frames (33/50 ms) as "drops frames", not as precise numbers.
 
-## Hypotheses
+## AFTER (perf/million-rows, every change)
+
+`bench/results/after.json`, same machine and browsers, single run (`npm run bench -- --label
+after --n 10000,100000,500000,1000000 --browsers chrome,firefox`). Two intermediate runs
+are kept for reference: `after-data.json` (search/filter/sort changes on the old
+virtualization) and `after-virtual.json` (virtualization changes).
+
+Rendering and scrolling:
+
+| browser | n | gen ms | first rows ms | heap MB | wheel p50/p95/max ms | drag p50/p95/max ms | header drift px | RO cb p95/max ms | offsets ms (per measurement / per list) |
+|---|---|---|---|---|---|---|---|---|---|
+| chrome 157 | 10,000 | 52 | 88 | 7 | 16.7 / 33.3 / 50 | 16.7 / 16.8 / 50 | 0.0 / 0.0 | 0.3 / 2.4 | 0.001 / 0.5 |
+| chrome 157 | 100,000 | 148 | 56 | 49 | 16.7 / 16.7 / 17 | 16.7 / 16.7 / 17 | 0.0 / 0.0 | 0.1 / 0.2 | 0.001 / 2.9 |
+| chrome 157 | 500,000 | 657 | 83 | 232 | 16.7 / 16.7 / 17 | 16.7 / 16.8 / 17 | 0.0 / 0.0 | 0.1 / 0.7 | 0.001 / 15.7 |
+| chrome 157 | 1,000,000 | 1315 | 205 | 462 | 16.7 / 16.7 / 17 | 16.7 / 16.8 / 17 | 0.0 / 0.0 | 0.1 / 0.2 | 0.001 / 33.0 |
+| firefox 151 | 10,000 | 28 | 65 | n/a | 17.1 / 17.1 / 134 | n/a | 0.0 / n/a | 0.0 / 1.0 | 0.001 / 0.0 |
+| firefox 151 | 100,000 | 219 | 72 | n/a | 17.1 / 17.1 / 17 | n/a | 0.0 / n/a | 0.0 / 1.0 | 0.001 / 5.0 |
+| firefox 151 | 500,000 | 1294 | 151 | n/a | 17.1 / 17.1 / 17 | n/a | 0.0 / n/a | 0.0 / 1.0 | 0.001 / 19.0 |
+| firefox 151 | 1,000,000 | 2417 | 290 | n/a | 17.1 / 17.1 / 17 | n/a | 0.0 / n/a | 0.0 / 1.0 | 0.001 / 32.0 |
+
+The 10k frame spikes (Chrome p95 33 ms / max 50 ms, Firefox max 134 ms) are the first size
+of each browser run, i.e. JIT warm-up; 100k–1M hold 60 Hz throughout.
+
+Reachability and interactions:
+
+| browser | n | max scrollHeight px | last row: drag | End key | scrollTop=max | scrollToRow | search first / later ms | first search after 2 s focus ms | clear ms | sort asc/desc ms | select all / none ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| chrome 157 | 10,000 | 582499 | ✓ | ✓ | ✓ | ✓ | 59 / 31 | 44 | 45 | 21 / 31 | 30 / 30 |
+| chrome 157 | 100,000 | 4297449 | ✓ | ✓ | ✓ | ✓ | 207 / 31 | 45 | 44 | 45 / 31 | 29 / 30 |
+| chrome 157 | 500,000 | 15000058 | ✓ | ✓ | ✓ | ✓ | 862 / 60 | 82 | 48 | 197 / 88 | 64 / 59 |
+| chrome 157 | 1,000,000 | 15000057 | ✓ | ✓ | ✓ | ✓ | 1713 / 110 | 121 | 62 | 474 / 191 | 146 / 138 |
+| firefox 151 | 10,000 | 461774 | no scrollbar | ✓ | ✓ | ✓ | 26 / 31 | 25 | 26 | 24 / 31 | 13 / 15 |
+| firefox 151 | 100,000 | 4064714 | no scrollbar | ✓ | ✓ | ✓ | 306 / 31 | 41 | 27 | 57 / 31 | 30 / 32 |
+| firefox 151 | 500,000 | 15000058 | no scrollbar | ✓ | ✓ | ✓ | 1359 / 65 | 75 | 43 | 242 / 165 | 80 / 97 |
+| firefox 151 | 1,000,000 | 15000058 | no scrollbar | ✓ | ✓ | ✓ | 3120 / 115 | 1362 | 75 | 493 / 264 | 196 / 165 |
+
+`scrollToRow(1000000)` makes the row visible in 148 ms (Chrome) / 248 ms (Firefox). The
+heap is measured before any search; the search texts add to it once search is used.
+
+### BEFORE → AFTER at 1M rows
+
+| at 1M | Chrome BEFORE | Chrome AFTER | Firefox BEFORE | Firefox AFTER |
+|---|---|---|---|---|
+| first rows | 579 ms | 205 ms | 758 ms | 290 ms |
+| heap | 492 MB | 462 MB | n/a | n/a |
+| wheel p50 / p95 / max | 16.7 / 33.4 / 67 | 16.7 / 16.7 / 17 | 17.1 / 83.4 / 101 | 17.1 / 17.1 / 17 |
+| drag p50 / p95 / max | 16.7 / 33.4 / 383 | 16.7 / 16.8 / 17 | n/a (no scrollbar) | n/a |
+| last row reachable (drag / End / scrollTop=max / scrollToRow) | ✗ ✗ ✗ ✗ (stops at ~834k) | ✓ ✓ ✓ ✓ | – ✗ ✗ ✗ (stops at ~236k) | – ✓ ✓ ✓ |
+| offsets work per measurement | 27.8 ms | 0.001 ms | 46 ms | 0.001 ms |
+| search first / later | 1,458 ms (every search) | 1,713 / 110 ms | timeout (> 120 s) | 3,120 / 115 ms |
+| first search, 2 s after focus | – | 121 ms | – | 1,362 ms |
+| clear search | 220 ms | 62 ms | timeout | 75 ms |
+| sort asc / desc | 1,306 / 1,038 ms | 474 / 191 ms | page hangs (> 30 s) | 493 / 264 ms |
+| select all / none | 410 / 192 ms | 146 / 138 ms | skipped | 196 / 165 ms |
+| header drift | 0 px | 0 px | 0 px | 0 px |
+
+## What changed and why
+
+- **Height cap + scroll mapping** (`src/core/scrollMap.ts`). Chrome caps an element at
+  ~33.5M px and Firefox at ~17.9M px, so the bottom rows were unreachable. The rows now get
+  at most `MAX_SCROLL_SPACE` = 15M px of scroll space (under both caps). Above that a scroll
+  position maps to a content position, `top = scrollTop + delta`, with `delta` fixed per
+  page of content (space / 100), so small scrolls move the content 1 px per px and large
+  jumps (thumb drag, End, Home, `scrollToRow`) map proportionally; the first page has
+  delta 0 and the last `total − space`, so both ends are exact. Below the cap nothing is mapped.
+- **Fenwick tree of row heights** (`src/core/heightTree.ts`). The old code rebuilt an O(n)
+  offsets array (27.8 ms at 1M) on almost every scroll frame. Heights now live in a binary
+  indexed tree: a measurement, a row's offset and the row at an offset are O(log n). The
+  tree is built once per row list (`buildTree`, ~33 ms at 1M), and an id → index map is
+  built once per list for the handle's lookups.
+- **Bottom anchoring + drag freeze** (`src/hooks/virtualScroll.ts`). End and
+  `scrollTop = max` missed the last row because rows measured taller than the 40 px estimate
+  grew the content below the viewport. While the view is at the bottom it now stays pinned
+  there as heights change, and End jumps to the last row and holds it while the rows near it
+  are measured. During a thumb drag the body height is frozen (and `scrollTop` is not
+  rewritten), so the thumb is not pulled from under the pointer; heights apply on release.
+- **Cached search/filter keys** (`src/hooks/rowIndex.ts`). Per `rows` × `columns`, each
+  row's lowercase search text and each filter column's `filterKey` are computed once and
+  stored by row index, so a keystroke is one `includes` per row, and a term that extends the
+  previous one only rechecks the previous result.
+- **Rank-based counting sort** (`src/core/sortRanks.ts`). Per sort column, every row's sort
+  key is turned once into a dense integer rank (radix sort for numbers, sorted words for
+  text); a sort is then a stable O(n) counting sort on ranks, in either direction, giving the
+  same order as the `compareValues` comparison sort (checked in `rowIndex.test.ts`).
+- **Lazy search text, warmed on focus** (`src/hooks/useClientTable.ts`). Building every
+  search text costs ~1.7 s (Chrome) / ~3 s (Firefox) at 1M and ~one string per row of
+  memory, so a table nobody searches never builds them. Building starts when the search box
+  gets focus (or a term is first entered) and runs in 8 ms slices between frames; a query
+  that arrives first finishes the rest synchronously. Client mode only.
+
+## Where the 1M Chrome sort time goes
+
+CPU profile (CDP, 100 µs sampling) of the sort step (Amount asc, desc, unsorted) at 1M:
+
+- **Rank build for the column, once per column per row list: ~200 ms** — `rankNumbers`,
+  `radixPass`, `ranksOf`, `rankTexts` and the key reads. Only the first sort of a column
+  pays it, which is why asc (first) is 474 ms and desc (ranks reused) 191 ms.
+- **Per new list, every sort click: ~120–150 ms of JS** — `orderByRanks` (~50 ms),
+  `buildTree` + `HeightTree` (~40 ms, the virtualization's heights for the new order),
+  `scopeIds = sorted.map(id)` in `useClientTable` (~32 ms, selection scope), plus GC of the
+  previous lists (~60 ms per click) and React's render/layout.
+
+No single avoidable O(n) pass dominates: the tree build is needed (heights follow the new
+order) and `scopeIds` is the only pass that could be made lazy (~30 ms). So 1M asc stays
+above 300 ms on the first sort of a column; later sorts are ~190 ms (Chrome) / ~260 ms (Firefox).
+
+## Remaining limits
+
+- **First sort of a column at 1M: ~470–490 ms** (rank build); later sorts 190–265 ms.
+- **First search at 1M without warm-up: 1.7 s (Chrome) / 3.1 s (Firefox).** Focusing the box
+  hides it if the user takes long enough before typing: after 2 s Chrome is done (121 ms),
+  Firefox is not (1,362 ms: its warm-up takes longer than 2 s). Later searches ~110 ms.
+- **Memory:** ~460–470 MB JS heap at 1M in Chrome (mostly the rows themselves plus one entry
+  object per row), plus one search string per row once search is used.
+- **Scroll mapping above 15M px:** the scrollbar maps proportionally, so at 1M one pixel of
+  thumb travel spans many rows; fine positioning is by wheel/keys, not the thumb.
+- **Firefox drag is unmeasured:** headless Firefox draws no scrollbar.
+- Single run per size; frame times are quantized to 60 Hz.
+- Beyond ~1M rows, or with heavier rows, use server or manual mode.
+
+## BEFORE findings (0ecc48d)
+
+What the BEFORE run showed, with the code locations of that commit.
 
 ### 1. Height cap — CONFIRMED (Chrome and Firefox)
 
@@ -157,7 +285,7 @@ Where the time goes (Chrome profile of one search at 1M):
   every value** (`src/core/search.ts:9-14`), then `.toLowerCase()` (`:30`). Nothing is
   cached between keystrokes. `parseDate` 172 ms, `formatObject` 82 ms, the
   `filterRows` callback 861 ms (`src/core/filters.ts:144`).
-- `filterEntries` maps all entries to rows first (`src/hooks/rowModel.ts:48`).
+- `filterEntries` maps all entries to rows first (`src/hooks/rowModel.ts:48`; removed since).
 - Sort reads each key once (`src/hooks/rowModel.ts:69`), but `compareValues` rebuilds a
   `SortKey` object for both sides on **every comparison** (`src/core/compare.ts:18-28`,
   called `:30-31`): `toNumber`/`parseDate`/`formatValue` and two allocations per compare,

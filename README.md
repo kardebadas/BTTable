@@ -760,6 +760,29 @@ const columns = useMemo(() => buildColumns(t), [t]);
 const rowProps = useCallback((row: Person) => ({ onClick: () => open(row.id) }), [open]);
 ```
 
+### Large data (up to 1M rows)
+
+Client mode handles 1,000,000 rows (measured in Chrome and Firefox, see
+[docs/benchmarks.md](docs/benchmarks.md)): 60 fps wheel and thumb scrolling, every row
+reachable, first render ~0.2–0.3 s.
+
+- **Scroll space is capped at ~15M px** (browsers cap element heights at ~17.9M px in
+  Firefox, ~33.5M px in Chrome). Above the cap the scrollbar maps proportionally to the
+  rows: small scrolls still move the content pixel for pixel, but at 1M rows one pixel of
+  thumb travel spans many rows, so fine positioning is by wheel or keys.
+- **End** in the scroll container jumps to the last row and keeps it in view while the rows
+  near it are measured (not when typing in an input).
+- **Memory:** ~470 MB JS heap at 1M rows in the bench (mostly the rows themselves), plus one
+  lowercase search string per row once search is used.
+- **First search** builds those strings: ~1.7 s (Chrome) / ~3 s (Firefox) at 1M. Building
+  starts in the background when the search box gets focus, so a user who focuses and then
+  types rarely waits; later searches take ~110 ms.
+- **First sort of a column** ranks its values once: ~0.5 s at 1M; later sorts ~0.2–0.3 s.
+- Thumb dragging is measured in Chrome only (headless Firefox draws no scrollbar).
+
+Beyond that (more rows, heavier rows, or slower devices) use [server mode](#server-mode) or
+[manual mode](#manual-mode), which only ever hold one page.
+
 ## Imperative handle (ref)
 
 ```tsx

@@ -318,3 +318,25 @@ describe('counter help', () => {
     expect(screen.getByText('Showing 1–3 of 3')).toBeInTheDocument();
   });
 });
+
+describe('search warm-up', () => {
+  const warmColumns = () => [{ key: 'name', header: 'Name', searchValue: vi.fn((row: Row) => row.name) }];
+
+  it('starts building the search texts when the search box gets focus (client mode)', () => {
+    const columns = warmColumns();
+    render(<BTTable columns={columns} rows={ROWS} />);
+    advance(1000);
+    expect(columns[0].searchValue).not.toHaveBeenCalled();
+    fireEvent.focus(searchBox());
+    advance(100);
+    expect(columns[0].searchValue).toHaveBeenCalledTimes(ROWS.length);
+  });
+
+  it('builds nothing in manual mode when the search box gets focus', () => {
+    const columns = warmColumns();
+    render(<BTTable columns={columns} mode="manual" rows={ROWS} totalRows={3} onQueryChange={() => {}} />);
+    fireEvent.focus(searchBox());
+    advance(1000);
+    expect(columns[0].searchValue).not.toHaveBeenCalled();
+  });
+});

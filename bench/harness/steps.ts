@@ -160,17 +160,39 @@ export async function sort({ page, timeoutMs }: StepContext) {
   return { ascMs, descMs };
 }
 
-/** Pastes a filtering term into the search box as one input event, then clears it with Backspace. */
+/** Selects the search box text and deletes it with Backspace; ms to the changed frame. */
+async function clearSearch(page: Page, timeoutMs: number) {
+  await page.keyboard.press('Control+A');
+  return timed(page, 'input', () => page.keyboard.press('Backspace'), timeoutMs);
+}
+
+/**
+ * Clicks the search box and at once pastes a filtering term as one input event (the first
+ * search: focus starts the warm-up, the query finishes it), clears it with Backspace, then
+ * pastes `lope`, which does not extend `lopes`, so it scans every prebuilt text (a later search).
+ */
 export async function search({ page, timeoutMs }: StepContext) {
   await scrollToTop(page);
-  const input = page.locator('.btt-search-input');
-  await input.click();
+  await page.locator('.btt-search-input').click();
   const queryMs = await timed(page, 'input', () => page.keyboard.insertText('lopes'), timeoutMs);
   const matches = await page.evaluate(() => document.querySelector('.btt-scroll table')?.getAttribute('aria-rowcount'));
-  await page.keyboard.press('Control+A');
-  const clearMs = await timed(page, 'input', () => page.keyboard.press('Backspace'), timeoutMs);
-  return { term: 'lopes', queryMs, matchedRows: Number(matches) - 1, clearMs };
+  const clearMs = await clearSearch(page, timeoutMs);
+  const laterMs = await timed(page, 'input', () => page.keyboard.insertText('lope'), timeoutMs);
+  await clearSearch(page, timeoutMs);
+  return { term: 'lopes', queryMs, matchedRows: Number(matches) - 1, clearMs, laterMs };
 }
+
+/** Reloads the page, focuses the search box, waits `FOCUS_WAIT_MS` (a user about to type), then runs `search`. */
+export async function searchAfterFocus(ctx: StepContext) {
+  await ctx.page.reload({ waitUntil: 'commit' });
+  await load(ctx);
+  await ctx.page.locator('.btt-search-input').focus();
+  await ctx.page.waitForTimeout(FOCUS_WAIT_MS);
+  return { waitMs: FOCUS_WAIT_MS, ...(await search(ctx)) };
+}
+
+/** Focus → first keystroke delay assumed by `searchAfterFocus`. */
+const FOCUS_WAIT_MS = 2_000;
 
 /** Clicks the select-all box (every filtered row), then again to clear. */
 export async function selectAll({ page, timeoutMs }: StepContext) {
