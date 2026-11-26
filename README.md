@@ -15,6 +15,7 @@ mounted.
 ## Contents
 
 - [Install](#install)
+- [Minimal table](#minimal-table)
 - [Quick start](#quick-start)
 - [Columns](#columns)
 - [Rows and ids](#rows-and-ids)
@@ -49,6 +50,34 @@ Import the stylesheet once, anywhere in your app:
 ```ts
 import '@kardebadas/bttable/styles.css';
 ```
+
+## Minimal table
+
+Only `columns` and `rows` are required:
+
+```tsx
+import { BTTable, type Column } from '@kardebadas/bttable';
+import '@kardebadas/bttable/styles.css';
+
+type Person = { id: number; name: string; role: string };
+
+const columns: Column<Person>[] = [
+  { key: 'name', header: 'Name' },
+  { key: 'role', header: 'Role' },
+];
+
+<BTTable columns={columns} rows={people} />;
+```
+
+That gives search, a record counter and pagination. For a plain table — just rows and
+sortable headers, with nothing above or below — turn those off and give no column a `filter`:
+
+```tsx
+<BTTable columns={columns} rows={people} search={false} showCounter={false} pagination={false} />
+```
+
+Add `sortable: false` to each column to drop the sort buttons, or `showTableHeader={false}`
+to drop the header row. Every variant, live with its code: `npm run demo` (the Gallery tab).
 
 ## Quick start
 
@@ -329,7 +358,7 @@ manual mode they export the current page only, unless `fetchAllRows` is given (s
 | `virtualize` | `'auto'` | `'auto'` mounts only the rows near the viewport when more than `virtualizeThreshold` rows are displayed; `true` always; `false` never. |
 | `virtualizeThreshold` | `100` | Displayed-row count above which `'auto'` virtualizes. |
 | `estimatedRowHeight` | `40` | Px assumed for a row until it is measured. |
-| `loading` | `false` | Shows "Loading…" in the status strip, dims the rows and sets `aria-busy`, without unmounting rows or moving the layout. In server mode the table also sets it while a request is in flight. |
+| `loading` | `false` | Shows "Loading…" in the status strip, dims the rows and sets `aria-busy`, without unmounting rows or moving the layout. In server mode the table also sets it while a request is in flight. The strip keeps one line of height above the table; a table with nothing above it (no search, counter, filters, export or `toolbarExtras`) and no `loading` prop keeps it out of the layout, so a plain table shows no empty bar: pass `loading={false}` to reserve the line. |
 | `emptyMessage` | `'No records found'` | Any React node, shown when no row matches. While loading with no rows, skeleton rows (the page size, at most 8) show instead, so the layout does not jump. |
 | `caption` | – | Visually hidden `<caption>` naming the table for assistive technology. |
 | `showTableHeader` | `true` | `false` renders no `<thead>`: no sort buttons and no select-all box (row checkboxes stay). Column widths still come from `columns`. |
@@ -991,7 +1020,7 @@ uses itself:
 
 ```sh
 npm install
-npm run demo           # demo app on http://localhost:5199 (client and server tabs)
+npm run demo           # demo app on http://localhost:5199 (gallery of every variant, then client, server and manual tabs)
 npm test               # unit tests (Vitest + Testing Library)
 npm run test:coverage  # with coverage (80 % line threshold)
 npm run check          # typecheck, lint, test, build
