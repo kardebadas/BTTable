@@ -55,6 +55,7 @@ body {
 
 .demo-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -148,4 +149,114 @@ body {
 /* Clips like a card or modal body would, to prove the MultiSelect popover escapes it. */
 .demo-clip {
   overflow: hidden;
+}
+
+/* Gallery */
+
+.demo-toc {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 24px;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--page-line);
+  border-radius: 8px;
+}
+
+.demo-toc h2 {
+  margin: 4px 0;
+  font-size: 0.9rem;
+}
+
+.demo-toc ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.demo-toc a,
+.demo-card h3 a {
+  color: inherit;
+}
+
+.demo-group-title {
+  margin: 28px 0 12px;
+  font-size: 1.1rem;
+}
+
+.demo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--page-line);
+  border-radius: 8px;
+  scroll-margin-top: 12px;
+}
+
+.demo-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.demo-when {
+  margin: 0;
+  color: var(--page-muted);
+}
+
+.demo-live {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.demo-live input:not(.btt *) {
+  padding: 3px 8px;
+  font: inherit;
+}
+
+.demo-code {
+  position: relative;
+  min-width: 0;
+}
+
+.demo-code pre {
+  overflow: auto;
+  max-height: 420px;
+  margin: 0;
+  padding: 12px;
+  font-size: 12px;
+  border: 1px solid var(--page-line);
+  border-radius: 6px;
+}
+
+.demo-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  background: var(--page-bg);
+  border: 1px solid var(--page-line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.demo-log {
+  margin: 0;
+  color: var(--page-muted);
+}
+
+/* tableClassName / colClassName hooks of the "tones-cells" card. */
+.demo-compact .btt-cell {
+  padding-block: 2px;
+}
+
+/* A <col> takes only background, border, width and visibility; row tones paint over the background. */
+.demo-col-highlight {
+  border-inline: 3px solid #e0a000;
 }

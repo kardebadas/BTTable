@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BTTable } from './BTTable';
 import type { BTTableClientProps } from './BTTableProps';
 import { tableMinWidth, toCssSize } from './components/ColGroup';
+import { hasTopControls } from './components/Controls';
 import type { Column, FetchRows } from './core/types';
 
 type Row = { id: number; name: string; age: number | null; note?: unknown };
@@ -284,6 +285,32 @@ describe('loading', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading…');
     expect(bodyRows(container)[0]).toBe(firstRow);
     expect(table(container)).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('keeps no empty bar above a plain table: the idle status strip takes no room', () => {
+    const plain = { search: false, showCounter: false, pagination: false } as const;
+    const { container, rerender } = setup(plain);
+    expect(container.querySelector('.btt-toolbar, .btt-filters')).toBeNull();
+    const status = screen.getByRole('status');
+    expect(status).toHaveClass('btt-status', 'btt-sr-only');
+    expect(status.style.minHeight).toBe('');
+    // A `loading` prop, even false, reserves the line so loading never shifts the table.
+    rerender(<BTTable columns={COLUMNS} rows={ROWS} {...plain} loading={false} />);
+    expect(screen.getByRole('status')).not.toHaveClass('btt-sr-only');
+    expect(screen.getByRole('status').style.minHeight).toBe('1.5em');
+    // So does anything above the table.
+    rerender(<BTTable columns={COLUMNS} rows={ROWS} {...plain} toolbarExtras={<button type="button">Add</button>} />);
+    expect(screen.getByRole('status')).not.toHaveClass('btt-sr-only');
+  });
+
+  it('knows when anything renders above the table', () => {
+    const plain = { columns: COLUMNS, search: false, showCounter: false };
+    expect(hasTopControls(plain)).toBe(false);
+    expect(hasTopControls({ ...plain, onExport: () => {} })).toBe(false);
+    expect(hasTopControls({ ...plain, onExport: () => {}, exportFormats: ['pdf'] })).toBe(true);
+    expect(hasTopControls({ ...plain, exportCsv: true })).toBe(true);
+    expect(hasTopControls({ ...plain, columns: [{ key: 'name', header: 'Name', filter: { type: 'text' } }] })).toBe(true);
+    expect(hasTopControls({ ...plain, showCounter: true })).toBe(true);
   });
 
   it('does not re-render rows whose entries did not change', () => {

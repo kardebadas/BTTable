@@ -1,7 +1,7 @@
 import { forwardRef, type ReactElement, type Ref, type RefAttributes, useId, useRef } from 'react';
 import { cx } from './components/classNames';
 import { ColGroup, leadingCount, tableMinWidth, toCssSize } from './components/ColGroup';
-import { FooterControls, type TableControls, TopControls } from './components/Controls';
+import { FooterControls, hasTopControls, type TableControls, TopControls } from './components/Controls';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { type RowExpansion, TableBody } from './components/TableBody';
 import { TableHead } from './components/TableHead';
@@ -40,8 +40,20 @@ type ViewProps<R> = ContentProps<R> & {
   expansion?: Expansion;
 };
 
-/** The status strip always keeps one line of height, so loading never shifts the table. */
+/** The status strip keeps one line of height, so loading never shifts the table. */
 const STATUS_STYLE = { minHeight: '1.5em' } as const;
+
+/**
+ * The status strip's class and style. With nothing above the table and no `loading` prop
+ * it can never show anything, so it stays mounted for assistive technology but takes no
+ * room: a plain table shows no empty bar.
+ */
+function statusProps<R>(props: ViewProps<R>) {
+  const loading = props.loading ?? false;
+  const className = cx('btt-status', loading && 'btt-status--loading');
+  if (props.loading === undefined && !(props.controls && hasTopControls(props))) return { className: cx(className, 'btt-sr-only') };
+  return { className, style: STATUS_STYLE };
+}
 
 /** Throws unless manual mode has `rows` and `onQueryChange` and no `fetchRows`. */
 function assertManual<R>({ rows, fetchRows, onQueryChange }: BTTableAnyProps<R>): void {
@@ -192,7 +204,7 @@ function TableView<R>(props: ViewProps<R>) {
     <>
       {controls && <TopControls {...props} controls={controls} />}
       <SelectionBar {...props} />
-      <div className={cx('btt-status', loading && 'btt-status--loading')} style={STATUS_STYLE} role="status" aria-live="polite">
+      <div {...statusProps(props)} role="status" aria-live="polite">
         {loading ? props.labels.loading : null}
       </div>
       <TableScroll {...props} />

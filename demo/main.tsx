@@ -4,14 +4,16 @@ import '../src/styles/theme.css';
 import '../src/styles/table.css';
 import '../src/styles/controls.css';
 import { ClientDemo } from './ClientDemo';
+import { Gallery } from './gallery/Gallery';
 import { ManualDemo } from './ManualDemo';
 import './demo.css';
 import { ServerDemo } from './ServerDemo';
 
-type Tab = 'client' | 'server' | 'manual';
+type Tab = 'gallery' | 'client' | 'server' | 'manual';
 type Theme = 'auto' | 'light' | 'dark';
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'gallery', label: 'Gallery' },
   { id: 'client', label: 'Client mode' },
   { id: 'server', label: 'Server mode' },
   { id: 'manual', label: 'Manual mode' },
@@ -23,7 +25,7 @@ function themeClass(theme: Theme): string | undefined {
 }
 
 function App() {
-  const [tab, setTab] = useState<Tab>('client');
+  const [tab, setTab] = useState<Tab>('gallery');
   const [theme, setTheme] = useState<Theme>('auto');
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -49,6 +51,7 @@ function App() {
         </label>
       </header>
       <div role="tabpanel">
+        {tab === 'gallery' && <Gallery themeClass={themeClass(theme)} />}
         {tab === 'client' && <ClientDemo themeClass={themeClass(theme)} />}
         {tab === 'server' && <ServerDemo themeClass={themeClass(theme)} />}
         {tab === 'manual' && <ManualDemo themeClass={themeClass(theme)} />}
