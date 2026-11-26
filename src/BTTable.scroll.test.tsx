@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { BTTable } from './BTTable';
 import type { BTTableServerProps } from './BTTableProps';
+import type { BTTableHandle } from './hooks/useTableHandle';
 import { deferredServer, settle } from './testing/serverFixture';
 import {
   COLUMNS,
@@ -113,6 +115,27 @@ describe('scroll position in manual mode', () => {
     rerender(element(firstPage));
     expect(scroller(container).scrollTop).toBe(2000);
     rerender(element(serverRows(500, 500)));
+    expect(scroller(container).scrollTop).toBe(0);
+  });
+
+  it('scrolls back to the top on resetKey when the parent answers with the same rows array', () => {
+    const firstPage = serverRows(0, 500);
+    const element = (resetKey: number) => (
+      <BTTable columns={SERVER_COLUMNS} mode="manual" rows={firstPage} totalRows={1000} pageSize={500} rowProps={rowProps} resetKey={resetKey} onQueryChange={() => {}} />
+    );
+    const { container, rerender } = render(element(0));
+    scrollTo(container, 2000);
+    rerender(element(1));
+    expect(scroller(container).scrollTop).toBe(0);
+  });
+
+  it('scrolls back to the top on resetView with the same rows array', () => {
+    const ref = createRef<BTTableHandle>();
+    const { container } = render(
+      <BTTable ref={ref} columns={SERVER_COLUMNS} mode="manual" rows={serverRows(0, 500)} totalRows={1000} pageSize={500} rowProps={rowProps} onQueryChange={() => {}} />,
+    );
+    scrollTo(container, 2000);
+    act(() => ref.current?.resetView());
     expect(scroller(container).scrollTop).toBe(0);
   });
 });

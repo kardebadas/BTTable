@@ -22,14 +22,18 @@ function append<T>(list: readonly T[], value: T): readonly T[] {
 
 /**
  * `to` with the search and filters reported since `from` recorded as waiting for their echo.
- * Any reported change also ends the page, search and filters holds: the table's next move replaces them.
+ * Any reported change also ends a page hold (the table's next move replaces it); the search
+ * and filters holds of a reset stay until their prop changes, so a move made before the
+ * parent's echo never brings the pre-reset values back.
  */
 export function recordProposals(from: TableState, to: TableState): TableState {
   if (!reportsChange(from, to)) return to;
-  const { searches, filters } = to.proposals;
+  const { searches, filters, searchHold, filtersHold } = to.proposals;
   return {
     ...to,
     proposals: {
+      searchHold,
+      filtersHold,
       searches: from.search === to.search ? searches : append(searches, to.search),
       filters: sameFilters(from.filters, to.filters) ? filters : append(filters, to.filters),
     },

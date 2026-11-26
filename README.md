@@ -429,7 +429,8 @@ const [page, setPage] = useState(1);
   `onPageChange(1)` once. When the parent's own change (search, filters, `pageSize`,
   `resetKey`) moves a controlled page, page 1 shows at once, before the parent answers, so
   server mode asks for page 1 straight away. That held page ends when the `page` prop changes
-  or with the table's next change. Page clamping (client: fewer rows; server: a smaller
+  or with the table's next change. A `resetKey` holds a controlled search and filters the same
+  way: the reset values show, and are sent, at once. Page clamping (client: fewer rows; server: a smaller
   reported total) calls `onPageChange` with the last page. `resetKey` calls `onSearchChange`,
   `onFiltersChange` and `onPageChange` with the reset values. A changed `pageSize` prop calls
   `onPageChange(1)`, not `onPageSizeChange`.
@@ -445,10 +446,12 @@ const [page, setPage] = useState(1);
   multiselect's compare item by item, so `{ status: params.getAll('status') }` is fine). In
   server mode an echoing parent costs exactly one request per change, and so does a parent
   change under a controlled page.
-- **`resetKey` with controlled search or filters.** Reset your own controlled search and
-  filters in the same update as `resetKey` when you can: if the parent only echoes the
-  reported reset values afterwards, server mode first sends a request with the old search and
-  filters (already on page 1) and then, aborting it, the reset one.
+- **`resetKey` with controlled search or filters.** A reset is the one exception to
+  "controlled props win": the table reports the reset values and shows (and sends) them at
+  once, while the `searchValue` and `filters` props still hold the old ones. Those held values
+  stay on screen until the prop changes — the echo, or any value you choose — so the table
+  never sends the old search and filters, even after a sort or filter change made before a
+  late echo. A parent that never echoes keeps the reset values on screen.
 - **`onStateChange`** (client) still reports the applied state and the filtered rows.
 
 ## Server mode
@@ -582,9 +585,11 @@ function Users() {
 
 Rules shared with server mode:
 
-- **Stale responses are your job.** The table cannot tell which query your rows answer: drop
-  a response whose query is no longer the latest, as above (or abort it with an
-  `AbortController`). Pass `loading` while a page loads, and end it on failure too (store the
+- **Stale responses are your job.** The table cannot tell which query your rows answer, so it
+  cannot drop out-of-order answers: drop a response whose query is no longer the latest, as
+  above (or abort it with an `AbortController`). The scroll position resets when new `rows`
+  arrive after a query change: the table takes the next rows you pass as the answer to the
+  latest query, stale or not. Pass `loading` while a page loads, and end it on failure too (store the
   failed query, as above), or the table stays loading.
 - **Counter and pages** come from the totals; without a valid total the counter counts the
   rows up to this page, and a full page offers one more page after it. Before the first page

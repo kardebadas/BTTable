@@ -73,12 +73,14 @@ function usePageClamp<R>(options: UseManualTableOptions<R>, paged: PagedQuery<R>
 /**
  * The view key current when the parent last changed `rows`: the view those rows show. Like
  * server mode on a response, the scroll position resets when the new rows arrive, not while
- * the old ones still show under the new query. Adjusted during render.
+ * the old ones still show under the new query. A reset (`resetKey`, `resetView`) passes at
+ * once, so it scrolls to the top even when the parent answers with the same rows array.
+ * Adjusted during render.
  */
-function useRowsViewKey(rows: unknown, viewKey: string): string {
-  const [seen, setSeen] = useState({ rows, viewKey });
-  if (seen.rows === rows) return seen.viewKey;
-  setSeen({ rows, viewKey });
+function useRowsViewKey(rows: unknown, viewKey: string, resets: number): string {
+  const [seen, setSeen] = useState({ rows, viewKey, resets });
+  if (seen.rows === rows && seen.resets === resets) return seen.viewKey;
+  setSeen({ rows, viewKey, resets });
   return viewKey;
 }
 
@@ -97,5 +99,5 @@ export function useManualTable<R>(options: UseManualTableOptions<R>): PagedTable
   // Like server mode before its first response: no counter while the first page loads.
   const showCounter = !loading || sourceSize(rows) > 0;
   const model = usePageModel(options, paged, { result: { rows, totalRows, totalFilteredRows }, rows, showCounter });
-  return { ...model, viewKey: useRowsViewKey(rows, paged.keys.viewKey), loading, error: false };
+  return { ...model, viewKey: useRowsViewKey(rows, paged.keys.viewKey, paged.state.resets), loading, error: false };
 }
