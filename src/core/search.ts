@@ -30,3 +30,22 @@ export function matchesSearch<R>(row: R, columns: readonly Column<R>[], term: st
     (column) => column.searchable !== false && columnSearchText(column, row).toLowerCase().includes(needle),
   );
 }
+
+/**
+ * Separates column texts in `rowSearchText`. A term containing it cannot be matched
+ * against the joined text; `matchesSearch` handles such terms.
+ */
+export const SEARCH_TEXT_SEPARATOR = '\u0000';
+
+/**
+ * The lowercase searchable text of every searchable column of `row`, joined by
+ * `SEARCH_TEXT_SEPARATOR`: for a term without the separator, `matchesSearch` is true
+ * exactly when this text includes the trimmed lowercase term. Build it once per row.
+ */
+export function rowSearchText<R>(row: R, columns: readonly Column<R>[]): string {
+  const parts: string[] = [];
+  for (const column of columns) {
+    if (column.searchable !== false) parts.push(columnSearchText(column, row).toLowerCase());
+  }
+  return parts.join(SEARCH_TEXT_SEPARATOR);
+}

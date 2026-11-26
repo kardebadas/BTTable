@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
 import type { RowEntry, RowId } from './rowModel';
 import { useLatest } from './useLatest';
-import { resolveRows, rowsInOrder, useSelectedRows } from './useSelectedRows';
+import { type RowsOf, useSelectedRows } from './useSelectedRows';
 
 /** Called after every selection change with the ids and the selected rows the table knows. */
 export type SelectionChange<R> = (ids: RowId[], rows: R[]) => void;
@@ -67,13 +67,38 @@ function usePruneVanished({ source, presentIds, controlled, setInternal }: Prune
   return next;
 }
 
-/** Next selection for the select-all box: clear the scope when all of it is selected, else add it. */
+/**
+ * The id set of selection lists this module built, so the render after a toggle does not
+ * build the same set again. Only lists without duplicates are stored.
+ */
+const knownSets = new WeakMap<readonly RowId[], ReadonlySet<RowId>>();
+
+/** The ids of `list` as a set, reused when `toggleAllIds` already built it. */
+function idSet(list: readonly RowId[]): ReadonlySet<RowId> {
+  return knownSets.get(list) ?? new Set(list);
+}
+
+/**
+ * Next selection for the select-all box: clear the scope when all of it is selected, else
+ * add it (selected ids first, then the new scope ids, without duplicates). The selected
+ * set left by the previous toggle is reused, so each toggle builds one set.
+ */
 function toggleAllIds(selected: readonly RowId[], scopeIds: readonly RowId[]): RowId[] {
-  const selectedSet = new Set(selected);
-  const all = scopeIds.length > 0 && scopeIds.every((id) => selectedSet.has(id));
-  if (!all) return Array.from(new Set([...selected, ...scopeIds]));
-  const scope = new Set(scopeIds);
-  return selected.filter((id) => !scope.has(id));
+  const selectedSet = idSet(selected);
+  const missing = scopeIds.filter((id) => !selectedSet.has(id));
+  if (missing.length === 0 && scopeIds.length > 0) {
+    const scope = new Set(scopeIds);
+    return selected.filter((id) => !scope.has(id));
+  }
+  const ids = new Set(selected);
+  const next = Array.from(ids);
+  for (const id of missing) {
+    if (ids.has(id)) continue;
+    ids.add(id);
+    next.push(id);
+  }
+  knownSets.set(next, ids);
+  return next;
 }
 
 /** Reports a selection to `onSelectionChange`, with the rows the table knows for it. */
@@ -124,13 +149,12 @@ function useClearOnDisable({ enabled, source, controlled, setInternal }: Disable
 }
 
 /** Calls `onSelectionChange` with the rows known in the latest render, so effects and handlers read fresh rows. */
-function useReporter<R>(onChange: SelectionChange<R> | undefined, rows: ReturnType<typeof useSelectedRows<R>>): Report {
+function useReporter<R>(onChange: SelectionChange<R> | undefined, rowsOf: RowsOf<R>): Report {
   const onChangeRef = useLatest(onChange);
-  const rowsRef = useLatest(rows);
+  const rowsRef = useLatest(rowsOf);
   return useCallback(
     (ids: readonly RowId[]) => {
-      const { known, cache } = rowsRef.current;
-      onChangeRef.current?.([...ids], rowsInOrder(ids, resolveRows(ids, known, cache)));
+      onChangeRef.current?.([...ids], rowsRef.current(ids));
     },
     [onChangeRef, rowsRef],
   );
@@ -143,18 +167,42 @@ function useNotify(ids: readonly RowId[] | null, report: Report): void {
   }, [ids, report]);
 }
 
-/** The selected and select-all state of the ids in `source` against `scopeIds`. */
-function useSelectionView<R>(source: readonly RowId[], scopeIds: readonly RowId[], cache: ReadonlyMap<RowId, R>) {
-  const selectedSet = useMemo(() => new Set(source), [source]);
+/** Whether every id of a non-empty scope is selected, and whether only some are. No scope pass when nothing is selected. */
+function scopeState(selected: ReadonlySet<RowId>, scopeIds: readonly RowId[]) {
+  if (selected.size === 0) return { allSelected: false, indeterminate: false };
+  const allSelected = scopeIds.length > 0 && scopeIds.every((id) => selected.has(id));
+  return { allSelected, indeterminate: !allSelected && scopeIds.some((id) => selected.has(id)) };
+}
+
+type View<R> = Pick<Selection<R>, 'selectedIds' | 'selectedRows' | 'isSelected' | 'allSelected' | 'indeterminate'>;
+
+/**
+ * The selected and select-all state of the ids in `source` against `scopeIds`.
+ * `selectedRows` is resolved on first read, so selecting a million rows does not list them
+ * unless someone asks.
+ */
+function useSelectionView<R>(source: readonly RowId[], scopeIds: readonly RowId[], rowsOf: RowsOf<R>): View<R> {
+  const selectedSet = useMemo(() => idSet(source), [source]);
   return useMemo(() => {
-    const allSelected = scopeIds.length > 0 && scopeIds.every((id) => selectedSet.has(id));
-    const indeterminate = !allSelected && scopeIds.some((id) => selectedSet.has(id));
-    const isSelected = (id: RowId) => selectedSet.has(id);
-    return { selectedIds: source, selectedRows: rowsInOrder(source, cache), isSelected, allSelected, indeterminate };
-  }, [source, scopeIds, selectedSet, cache]);
+    let selectedRows: R[] | null = null;
+    return {
+      selectedIds: source,
+      get selectedRows() {
+        selectedRows ??= rowsOf(source);
+        return selectedRows;
+      },
+      isSelected: (id: RowId) => selectedSet.has(id),
+      ...scopeState(selectedSet, scopeIds),
+    };
+  }, [source, scopeIds, selectedSet, rowsOf]);
 }
 
 const NO_ENTRIES: never[] = [];
+
+/** `view` with the actions added, keeping its lazy `selectedRows` getter (a spread would read it). */
+function withActions<R>(view: View<R>, actions: Pick<Selection<R>, 'clear' | 'toggleRow' | 'toggleAll'>): Selection<R> {
+  return Object.defineProperties({ ...actions }, Object.getOwnPropertyDescriptors(view)) as Selection<R>;
+}
 
 /**
  * Controlled or uncontrolled row selection. `toggleAll` selects every id in scope (or
@@ -177,6 +225,6 @@ export function useSelection<R = unknown>(options: SelectionOptions<R>): Selecti
   const latestRef = useLatest(source);
   const scopeRef = useLatest(scopeIds);
   const actions = useSelectionActions({ controlled, setInternal, report, latestRef, scopeRef });
-  const view = useSelectionView(source, scopeIds, rows.cache);
-  return useMemo(() => ({ ...view, ...actions }), [view, actions]);
+  const view = useSelectionView(source, scopeIds, rows);
+  return useMemo(() => withActions(view, actions), [view, actions]);
 }

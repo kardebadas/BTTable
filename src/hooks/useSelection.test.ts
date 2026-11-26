@@ -117,4 +117,38 @@ describe('useSelection', () => {
     expect(result.current.toggleRow).toBe(first.toggleRow);
     expect(result.current.toggleAll).toBe(first.toggleAll);
   });
+
+  it('selects and clears a large scope, listing the selected rows only when read', () => {
+    let reads = 0;
+    const scopeIds = Array.from({ length: 5000 }, (_, i) => i);
+    const entries = scopeIds.map((id) => ({
+      index: id,
+      row: `row ${id}`,
+      get id() {
+        reads += 1;
+        return id;
+      },
+    }));
+    const { result } = setup({ scopeIds, entries });
+    act(() => result.current.toggleAll());
+    expect(result.current.allSelected).toBe(true);
+    expect(result.current.isSelected(4999)).toBe(true);
+    expect(result.current.selectedIds).toEqual(scopeIds);
+    expect(reads).toBe(0);
+    expect(result.current.selectedRows).toHaveLength(5000);
+    expect(result.current.selectedRows[4999]).toBe('row 4999');
+    act(() => result.current.toggleAll());
+    expect(result.current.selectedIds).toEqual([]);
+    expect(result.current.allSelected || result.current.indeterminate).toBe(false);
+  });
+
+  it('adds the scope after the distinct selected ids, and keeps them when the scope is empty', () => {
+    const { result, rerender } = setup({ scopeIds: [3, 4, 3], defaultSelectedIds: [1, 1, 3] });
+    act(() => result.current.toggleAll());
+    expect(result.current.selectedIds).toEqual([1, 3, 4]);
+    rerender({ scopeIds: [] });
+    act(() => result.current.toggleAll());
+    expect(result.current.selectedIds).toEqual([1, 3, 4]);
+  });
 });
+

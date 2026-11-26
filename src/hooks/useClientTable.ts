@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { clampPage, pageCount, paginate } from '../core/pagination';
 import type { Column, FilterState, SortState } from '../core/types';
-import { buildEntries, filterEntries, type RowEntry, type RowId, type RowSource, sortEntries } from './rowModel';
+import { buildEntries, type RowEntry, type RowId, type RowSource } from './rowModel';
+import { RowIndex } from './rowIndex';
 import type { TableState } from './tableReducer';
 import { useLatest } from './useLatest';
 import { type Expansion, type ExpansionProps, useExpansion } from './useExpansion';
@@ -68,31 +69,55 @@ export type ClientTable<R> = TableActions & {
   expansion: Expansion;
 };
 
-function sameState<R>(a: ClientTableState<R>, b: ClientTableState<R>): boolean {
+/** `ClientTableState` with the filtered entries instead of their rows, which are listed only when reported. */
+type ReportedState<R> = Omit<ClientTableState<R>, 'filteredRows'> & { sorted: RowEntry<R>[] };
+
+/** Same fields and the same filtered rows in the same order; a different list of the same rows counts as the same. */
+function sameState<R>(a: ReportedState<R>, b: ReportedState<R>): boolean {
   const sameFields = a.search === b.search && a.filters === b.filters && a.sort === b.sort;
   if (!sameFields || a.page !== b.page || a.pageSize !== b.pageSize) return false;
-  if (a.filteredRows === b.filteredRows) return true;
-  return a.filteredRows.length === b.filteredRows.length && a.filteredRows.every((row, i) => row === b.filteredRows[i]);
+  if (a.sorted === b.sorted) return true;
+  return a.sorted.length === b.sorted.length && a.sorted.every((entry, i) => entry.row === b.sorted[i].row);
 }
 
 /** Calls `onStateChange` at mount and whenever a reported field or the filtered rows change. */
-function useStateChange<R>(state: ClientTableState<R>, onStateChange?: (state: ClientTableState<R>) => void): void {
+function useStateChange<R>(state: ReportedState<R>, onStateChange?: (state: ClientTableState<R>) => void): void {
   const callback = useLatest(onStateChange);
-  const last = useRef<ClientTableState<R> | null>(null);
+  const last = useRef<ReportedState<R> | null>(null);
+  const listed = useRef<{ sorted: RowEntry<R>[]; rows: R[] } | null>(null);
   useEffect(() => {
     if (last.current && sameState(last.current, state)) return;
     last.current = state;
-    callback.current?.(state);
+    if (!callback.current) return;
+    const { sorted, ...fields } = state;
+    // The same filtered list keeps its rows array, as when it was memoized per list.
+    if (listed.current?.sorted !== sorted) listed.current = { sorted, rows: sorted.map((entry) => entry.row) };
+    callback.current({ ...fields, filteredRows: listed.current.rows });
   });
 }
 
-/** Filtered → sorted rows, memoized per input. */
+/** Builds the search texts of a new row index in short slices between frames, so the first search is fast. */
+function useWarmSearch<R>(index: RowIndex<R>): void {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const step = () => {
+      if (!index.warmSearch(8)) timer = setTimeout(step, 0);
+    };
+    timer = setTimeout(step, 0);
+    return () => clearTimeout(timer);
+  }, [index]);
+}
+
+/** Searched → filtered → sorted rows, memoized per input, on per-row values cached in a `RowIndex`. */
 function useFilteredRows<R>(options: UseClientTableOptions<R>, state: TableState) {
   const { rows, columns, getRowId } = options;
   const entries = useMemo(() => buildEntries(rows, getRowId), [rows, getRowId]);
+  const index = useMemo(() => new RowIndex(entries, columns), [entries, columns]);
+  useWarmSearch(index);
   const { search, filters, sort } = state;
-  const filtered = useMemo(() => filterEntries({ entries, columns, search, filters }), [entries, columns, search, filters]);
-  const sorted = useMemo(() => sortEntries(filtered, columns, sort), [filtered, columns, sort]);
+  const searched = useMemo(() => index.search(search), [index, search]);
+  const filtered = useMemo(() => index.filter(searched, filters), [index, searched, filters]);
+  const sorted = useMemo(() => index.sort(filtered, sort), [index, filtered, sort]);
   return { entries, sorted };
 }
 
@@ -120,9 +145,8 @@ export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTabl
   useClampReport(page, state.page, apply);
   const pageRows = useMemo(() => paginate(sorted, page, size), [sorted, page, size]);
 
-  const filteredRows = useMemo(() => sorted.map((entry) => entry.row), [sorted]);
   const { search, filters, sort, pageSize } = state;
-  useStateChange({ search, filters, sort, page, pageSize, filteredRows }, options.onStateChange);
+  useStateChange({ search, filters, sort, page, pageSize, sorted }, options.onStateChange);
 
   const presentIds = useMemo(() => new Set(entries.map((entry) => entry.id)), [entries]);
   const scopeIds = useMemo(() => sorted.map((entry) => entry.id), [sorted]);
