@@ -108,5 +108,14 @@ export type FetchResult<R> = { rows: R[]; totalRows: number; totalFilteredRows?:
 /** Server-mode data source; must honour `signal` so stale requests can be aborted. */
 export type FetchRows<R> = (query: Query, ctx: { signal: AbortSignal }) => Promise<FetchResult<R>>;
 
+/** A `Query` without paging: search, sort and filters, for loading every matching row. */
+export type ExportQuery = Omit<Query, 'page' | 'pageSize'>;
+
+/**
+ * Server and manual mode: loads every row matching `query` (no paging) for CSV and
+ * `onExport`. Should honour `signal`: a second click on the busy export button aborts it.
+ */
+export type FetchAllRows<R> = (query: ExportQuery, ctx: { signal: AbortSignal }) => Promise<R[]>;
+
 /** Export payload: one text header per column and one row of cell values per data row. */
 export type ExportData = { headers: string[]; rows: (string | number)[][] };

@@ -31,6 +31,10 @@ export type BTTableLabels = {
   exportCsv: string;
   /** Text of each `exportFormats` button; `{format}` is the format name in upper case. */
   exportFormat: string;
+  /** Server and manual mode with `fetchAllRows`: text of the export button while it loads every row; a click cancels. */
+  exportBusy: string;
+  /** Server and manual mode with `fetchAllRows`: status text after loading the rows to export failed. */
+  exportError: string;
   /** Accessible name of the pagination `<nav>`. */
   pagination: string;
   previousPage: string;
@@ -45,6 +49,8 @@ export type BTTableLabels = {
   selectAll: string;
   /** Accessible name of each row checkbox. */
   selectRow: string;
+  /** Accessible name of each detail toggle button and of its header cell (`renderDetail`). */
+  rowDetails: string;
   /** Accessible name of the filters panel. */
   filters: string;
   /** The empty choice of `select` filters and the summary of an empty `multiselect`. */
@@ -79,6 +85,8 @@ export const DEFAULT_LABELS: Readonly<BTTableLabels> = Object.freeze({
   clearAll: 'Clear all',
   exportCsv: 'CSV',
   exportFormat: '{format}',
+  exportBusy: 'Exporting… (cancel)',
+  exportError: 'The export failed.',
   pagination: 'Pagination',
   previousPage: 'Previous',
   nextPage: 'Next',
@@ -87,6 +95,7 @@ export const DEFAULT_LABELS: Readonly<BTTableLabels> = Object.freeze({
   pageSize: 'Rows per page',
   selectAll: 'Select all',
   selectRow: 'Select row',
+  rowDetails: 'Row details',
   filters: 'Filters',
   filterAll: 'All',
   filterFrom: 'from',

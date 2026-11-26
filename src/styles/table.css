@@ -209,6 +209,58 @@
   background-color: color-mix(in srgb, var(--btt-accent) 16%, var(--btt-bg));
 }
 
+/* Detail rows (renderDetail): the leading toggle column and the row under an expanded row */
+
+.btt-th--expand,
+.btt-cell--expand {
+  padding-inline: 0;
+  text-align: center;
+}
+
+.btt-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  color: var(--btt-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--btt-radius);
+  cursor: pointer;
+}
+
+.btt-expand:hover {
+  color: var(--btt-fg);
+  border-color: var(--btt-border-strong);
+}
+
+.btt-expand-icon {
+  transition: transform 0.15s ease;
+}
+
+.btt-expand[aria-expanded='true'] .btt-expand-icon {
+  transform: rotate(90deg);
+}
+
+.btt-detail-cell {
+  padding: 10px 12px;
+  background-color: var(--btt-surface);
+  border-bottom: 1px solid var(--btt-border);
+}
+
+/* Every-row export (fetchAllRows): the busy button and the status line */
+
+.btt-export[aria-busy='true'] {
+  cursor: progress;
+}
+
+.btt-export-status {
+  color: var(--btt-danger);
+}
+
 /* Skeleton rows while the first rows load (never .btt-row) */
 
 .btt-skeleton {

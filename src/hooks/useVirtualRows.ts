@@ -17,6 +17,8 @@ export type UseVirtualRowsInput<R> = {
   estimatedRowHeight: number;
   /** The scroll container; its `table > tbody > tr.btt-row` children are the mounted rows. */
   scrollRef: RefObject<HTMLElement | null>;
+  /** Rows whose detail row is open: a row that opens or closes has a new height to measure. */
+  expandedIds?: readonly RowId[];
 };
 
 /** Measured row heights by row id. Mutated in place: it is the one source of truth. */
@@ -60,33 +62,60 @@ function storeHeights(cache: Heights, measured: readonly [RowId, number][]): boo
   return changed;
 }
 
-/** Measures the given elements that are mounted rows of the last commit; others are skipped. */
+/** The detail row (`tr.btt-detail-row`) right after a data row, if any. */
+export function detailRowOf(row: Element): Element | null {
+  const next = row.nextElementSibling;
+  return next?.classList.contains('btt-detail-row') ? next : null;
+}
+
+/** A row's measured unit: the data row plus its detail row, so both move as one. */
+function unitHeight(row: Element): number {
+  const detail = detailRowOf(row);
+  return row.getBoundingClientRect().height + (detail ? detail.getBoundingClientRect().height : 0);
+}
+
+/**
+ * Measures the units of the given elements that are mounted rows (or their detail rows) of
+ * the last commit; others are skipped.
+ */
 function measure<R>(live: Live<R>, elements: Iterable<Element>): [RowId, number][] {
-  const measured: [RowId, number][] = [];
+  const measured = new Map<RowId, number>();
   for (const element of elements) {
     const id = live.ids.get(element);
-    if (id !== undefined) measured.push([id, element.getBoundingClientRect().height]);
+    if (id === undefined) continue;
+    const row = element.classList.contains('btt-detail-row') ? element.previousElementSibling : element;
+    if (row) measured.set(id, unitHeight(row));
   }
-  return measured;
+  return [...measured];
 }
 
 /**
  * Stores new row heights and moves the scroll position by the height change above the
  * first visible row, so what the user is looking at stays put. One offsets pass, handed to
- * the render, when anything changed.
+ * the render, when anything changed, or always with `force` (cached heights were dropped).
  */
-function applyMeasurements<R>({ live, cache, scrollRef, setters }: Shared<R>, elements: Iterable<Element>): void {
+function applyMeasurements<R>({ live, cache, scrollRef, setters }: Shared<R>, elements: Iterable<Element>, force = false): void {
   const scroller = scrollRef.current;
   if (!scroller) return;
   setters.setViewport(scroller.clientHeight);
   const current = live.current;
-  if (!storeHeights(cache, measure(current, elements))) return;
+  if (!storeHeights(cache, measure(current, elements)) && !force) return;
   const after = offsetsOf(current.entries, cache, current.estimate);
   const top = anchoredScrollTop({ before: current.offsets, after, scrollTop: scroller.scrollTop });
   if (top !== scroller.scrollTop) scroller.scrollTop = top;
   current.offsets = after;
   setters.setLayout({ entries: current.entries, estimate: current.estimate, offsets: after });
   setters.setScrollTop(scroller.scrollTop);
+}
+
+/**
+ * Drops the cached heights of rows that opened or closed their detail row since `before`, so
+ * an unmounted one falls back to the estimate instead of a stale height. True when any was cached.
+ */
+function dropToggled(cache: Heights, before: readonly RowId[], after: readonly RowId[]): boolean {
+  const kept = new Set(before);
+  const toggled = after.filter((id) => !kept.delete(id)).concat([...kept]);
+  return toggled.map((id) => cache.delete(id)).some(Boolean);
 }
 
 /** Drops cached heights of rows no longer in `entries`, so the cache stays the size of the data. */
@@ -114,6 +143,7 @@ function useResizeObserver<R>(enabled: boolean, shared: Shared<R>): RefObject<Re
 
 type CommitInput<R> = {
   enabled: boolean;
+  expandedIds: readonly RowId[];
   entries: readonly RowEntry<R>[];
   estimate: number;
   /** The offsets this commit rendered. */
@@ -129,8 +159,11 @@ function mountedRows(scroller: HTMLElement): HTMLElement[] {
 
 type Commit<R> = Pick<CommitInput<R>, 'entries' | 'estimate' | 'offsets' | 'start'> & { rows: HTMLElement[] };
 
+const NO_IDS: RowId[] = [];
+
 /**
- * Points `live` at the committed entries and maps each mounted row element to its row id.
+ * Points `live` at the committed entries and maps each mounted row element, and its detail
+ * row, to its row id.
  * The rendered offsets are taken only for a new list or estimate: otherwise `live.offsets`,
  * kept current by every measurement, is never older than what a render saw.
  */
@@ -141,24 +174,34 @@ function recordCommit<R>(live: Live<R>, commit: Commit<R>): void {
   live.ids = new WeakMap();
   commit.rows.forEach((row, i) => {
     const entry = commit.entries[commit.start + i];
-    if (entry) live.ids.set(row, entry.id);
+    if (!entry) return;
+    live.ids.set(row, entry.id);
+    const detail = detailRowOf(row);
+    if (detail) live.ids.set(detail, entry.id);
   });
 }
 
 /**
- * After every commit: maps the mounted rows to their ids, (re)observes them, and measures
- * them at once, so newly mounted rows replace their estimate before the browser paints.
+ * After every commit: maps the mounted rows to their ids, (re)observes them and their detail
+ * rows, and measures them at once, so newly mounted rows replace their estimate before the browser paints.
  */
-function useMeasureAfterCommit<R>({ enabled, observer, ...commit }: CommitInput<R>, shared: Shared<R>): void {
+function useMeasureAfterCommit<R>({ enabled, observer, expandedIds, ...commit }: CommitInput<R>, shared: Shared<R>): void {
+  const expandedBefore = useRef(expandedIds);
   useBrowserLayoutEffect(() => {
     const scroller = shared.scrollRef.current;
+    const dropped = dropToggled(shared.cache, expandedBefore.current, expandedIds);
+    expandedBefore.current = expandedIds;
     if (!enabled || !scroller) return;
     const rows = mountedRows(scroller);
     recordCommit(shared.live.current, { ...commit, rows });
     observer.current?.disconnect();
     observer.current?.observe(scroller);
-    rows.forEach((row) => observer.current?.observe(row));
-    applyMeasurements(shared, rows);
+    rows.forEach((row) => {
+      observer.current?.observe(row);
+      const detail = detailRowOf(row);
+      if (detail) observer.current?.observe(detail);
+    });
+    applyMeasurements(shared, rows, dropped);
   });
 }
 
@@ -242,11 +285,12 @@ export type VirtualRows = {
 /**
  * Row virtualization for the scroll container in `scrollRef`: which entries to mount and
  * the spacer heights around them, plus their offsets. Row heights are measured (one `ResizeObserver`, cached by
- * row id) and stand in for `estimatedRowHeight` once known; the first visible row stays put
+ * row id; a data row and its detail row count as one unit) and stand in for `estimatedRowHeight` once known; the first visible row stays put
  * when heights above it change; the scroll position resets to the top when `viewKey`
  * changes. When `enabled` is false every entry is mounted, with no spacers.
  */
-export function useVirtualRows<R>({ entries, viewKey, enabled, estimatedRowHeight, scrollRef }: UseVirtualRowsInput<R>): VirtualRows {
+export function useVirtualRows<R>(input: UseVirtualRowsInput<R>): VirtualRows {
+  const { entries, viewKey, enabled, estimatedRowHeight, scrollRef } = input;
   const [cache] = useState<Heights>(() => new Map());
   const [layout, setLayout] = useState<Layout<R>>({ entries: [], estimate: estimatedRowHeight, offsets: NO_OFFSETS });
   const [scrollTop, setScrollTop] = useState(0);
@@ -264,7 +308,7 @@ export function useVirtualRows<R>({ entries, viewKey, enabled, estimatedRowHeigh
   useListChange(entries, viewKey, shared);
   useScrollTracking(enabled, scrollRef, setScrollTop);
   const observer = useResizeObserver(enabled, shared);
-  const commit = { enabled, entries, estimate: estimatedRowHeight, offsets, start: window.start, observer };
+  const commit = { enabled, entries, estimate: estimatedRowHeight, offsets, start: window.start, observer, expandedIds: input.expandedIds ?? NO_IDS };
   useMeasureAfterCommit(commit, shared);
   const jumpTo = useJumpTo(scrollRef, setScrollTop);
   return { range: window, offsets, jumpTo };

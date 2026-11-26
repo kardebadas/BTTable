@@ -1,4 +1,4 @@
-import { compareValues, type Column, type FetchResult, type FilterState, type Query } from '../src';
+import { compareValues, type Column, type ExportQuery, type FetchResult, type FilterState, type Query } from '../src';
 import { filterRows } from '../src/core/filters';
 
 /** Simulated network latency of every request, in ms. */
@@ -48,4 +48,10 @@ export function fakeFetch<R>(input: FakeFetchInput<R>): Promise<FetchResult<R>> 
       { once: true },
     );
   });
+}
+
+/** An in-memory `fetchAllRows` backend: every row matching the query, after `LATENCY_MS`. */
+export function fakeFetchAll<R>(input: Omit<FakeFetchInput<R>, 'query'> & { query: ExportQuery }): Promise<R[]> {
+  const query = { ...input.query, page: 1, pageSize: Number.MAX_SAFE_INTEGER };
+  return fakeFetch({ ...input, query }).then((result) => result.rows);
 }

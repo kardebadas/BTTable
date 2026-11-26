@@ -105,7 +105,7 @@ describe('manual mode: rows, counter and pages', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     renderManual({ rows: [{ name: 'a', state: 'ny' }] as never, totalRows: 1, selectable: true });
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toMatch(/selectable paged rows need ids/);
+    expect(warn.mock.calls[0][0]).toMatch(/selectable or expandable \(renderDetail\) paged rows need ids/);
   });
 
   it('counts from the totals and pages through totalFilteredRows', () => {

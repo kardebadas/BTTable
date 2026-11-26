@@ -7,6 +7,8 @@ export type {
   Column,
   DateOp,
   ExportData,
+  ExportQuery,
+  FetchAllRows,
   FetchResult,
   FetchRows,
   FilterSpec,
@@ -28,7 +30,7 @@ export { buildExportData, toCsv } from './core/export';
 export { formatValue } from './core/values';
 export { BTTable } from './BTTable';
 export type { BTTableClientProps, BTTableCommonProps, BTTableManualProps, BTTableProps, BTTableServerProps, SelectionBarContext } from './BTTableProps';
-export type { RowAttributes, RowTone } from './components/TableBody';
+export type { DetailContext, RowAttributes, RowTone } from './components/TableBody';
 export type { BTTableHandle, RowAlign } from './hooks/useTableHandle';
 export type { RowMount, RowUnmount } from './hooks/useRowLifecycle';
 export type { RowId, RowSource } from './hooks/rowModel';

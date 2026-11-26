@@ -15,13 +15,17 @@ function setup(props: Partial<BTTableClientProps<Row>> = {}) {
   return { ...view, handle: () => ref.current as BTTableHandle };
 }
 
-/** Fake rects: the scroll area at top 100, a 30 px header, the row with data-row-id 2 at `rowTop` (40 px tall). */
-function mockRects(rowTop: number) {
+/**
+ * Fake rects: the scroll area at top 100, a 30 px header, the row with data-row-id 2 at
+ * `rowTop` (40 px tall), and every detail row at `detail`.
+ */
+function mockRects(rowTop: number, detail = { top: 0, height: 0 }) {
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
     let rect = { top: 0, height: 0 };
     if (this.classList.contains('btt-scroll')) rect = { top: 100, height: 200 };
     if (this.tagName === 'THEAD') rect = { top: 100, height: 30 };
     if ((this as HTMLElement).dataset?.rowId === '2') rect = { top: rowTop, height: 40 };
+    if (this.classList.contains('btt-detail-row')) rect = detail;
     return { ...rect, bottom: rect.top + rect.height, width: 100, left: 0, right: 100, x: 0, y: rect.top, toJSON: () => ({}) };
   });
 }
@@ -59,6 +63,20 @@ describe('scrollToRow', () => {
     const { container, handle } = setup({ rows: makeRows(3) });
     scroller(container).scrollTop = 100;
     mockRects(rowTop);
+    expect(handle().scrollToRow(2, { align })).toBe(true);
+    expect(scroller(container).scrollTop).toBe(expected);
+  });
+
+  it.each([
+    ['start', 100 + 270],
+    ['end', 100 + 220],
+    ['center', 100 + 245],
+    ['nearest', 100 + 220],
+  ] as const)('align %s fits the row and its open detail row (400–520) as one unit: scrolls to %i', (align, expected) => {
+    const detail = () => <p>Detail</p>;
+    const { container, handle } = setup({ rows: makeRows(3), renderDetail: detail, defaultExpandedIds: [2] });
+    scroller(container).scrollTop = 100;
+    mockRects(400, { top: 440, height: 80 });
     expect(handle().scrollToRow(2, { align })).toBe(true);
     expect(scroller(container).scrollTop).toBe(expected);
   });

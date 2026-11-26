@@ -1,7 +1,9 @@
 import { type Ref, type RefObject, useImperativeHandle, useRef } from 'react';
+import { leadingCount } from '../components/ColGroup';
 import type { Column } from '../core/types';
 import type { RowEntry, RowId } from './rowModel';
 import { useBrowserLayoutEffect } from './useBrowserLayoutEffect';
+import { detailRowOf } from './useVirtualRows';
 
 /** Where `scrollToRow` puts the row in the scroll area (below the sticky header). */
 export type RowAlign = 'start' | 'center' | 'end' | 'nearest';
@@ -46,6 +48,8 @@ export type HandleInput<R> = {
   viewKey: string;
   columns: readonly Column<R>[];
   selectable: boolean;
+  /** The leading detail toggle column is on (`renderDetail`). */
+  expandable?: boolean;
   elements: ReadonlyMap<RowId, HTMLTableRowElement>;
   virtual: { enabled: boolean; offsets: readonly number[]; jumpTo: (top: number) => void };
   page: number;
@@ -65,13 +69,22 @@ type ScrollRequest = { id: RowId; align: RowAlign; focusKey?: string; jumped: bo
 
 type Live<R> = { input: HandleInput<R> | null; pending: ScrollRequest | null };
 
-/** How far to scroll so the row sits at `align` in the area below the sticky header. */
+/** The box of a row and its open detail row together, the unit `scrollToRow` aligns. */
+function unitRect(row: HTMLElement): { top: number; bottom: number; height: number } {
+  const rect = row.getBoundingClientRect();
+  const detail = detailRowOf(row);
+  if (!detail) return rect;
+  const bottom = detail.getBoundingClientRect().bottom;
+  return { top: rect.top, bottom, height: bottom - rect.top };
+}
+
+/** How far to scroll so the row (with its open detail row) sits at `align` in the area below the sticky header. */
 function alignDelta(scroller: HTMLElement, row: HTMLElement, align: RowAlign): number {
   const box = scroller.getBoundingClientRect();
   const head = scroller.querySelector('thead')?.getBoundingClientRect().height ?? 0;
   const top = box.top + head;
   const bottom = box.top + scroller.clientHeight;
-  const rect = row.getBoundingClientRect();
+  const rect = unitRect(row);
   if (align === 'start') return rect.top - top;
   if (align === 'end') return rect.bottom - bottom;
   if (align === 'center') return (rect.top + rect.bottom - top - bottom) / 2;
@@ -79,11 +92,11 @@ function alignDelta(scroller: HTMLElement, row: HTMLElement, align: RowAlign): n
   return rect.bottom > bottom ? rect.bottom - bottom : 0;
 }
 
-/** The `<td>` of `columnKey` in a mounted row, after the selection cell. */
+/** The `<td>` of `columnKey` in a mounted row, after the detail toggle and selection cells. */
 function cellOf<R>(input: HandleInput<R>, row: HTMLTableRowElement, columnKey: string): HTMLTableCellElement | null {
   const index = input.columns.findIndex((column) => column.key === columnKey);
   if (index < 0) return null;
-  return row.cells[index + (input.selectable ? 1 : 0)] ?? null;
+  return row.cells[index + leadingCount(input)] ?? null;
 }
 
 const FOCUSABLE = [

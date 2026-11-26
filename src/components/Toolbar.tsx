@@ -30,6 +30,13 @@ export type ToolbarProps = {
   onExport?: (format: string) => void;
   /** Disables every export button (nothing to export, or loading). */
   exportDisabled?: boolean;
+  /**
+   * The export button loading its rows (`exportTarget`): it shows `exportBusy` with
+   * `aria-busy` and stays enabled so a click cancels; the other export buttons are disabled.
+   */
+  exportBusy?: string | null;
+  /** A status line next to the export buttons (e.g. a failed export); `undefined` leaves it out. */
+  exportStatus?: string;
   extras?: ReactNode;
 };
 
@@ -72,21 +79,46 @@ function SearchBox({ value, placeholder, onChange, onClear, labels }: ToolbarSea
   );
 }
 
-function ExportButtons({ labels, onExportCsv, exportFormats, onExport, exportDisabled = false }: ToolbarProps) {
+/** The key of an export button: the CSV button, or the button of one `exportFormats` name. */
+export function exportTarget(format?: string): string {
+  return format === undefined ? 'csv' : `format:${format}`;
+}
+
+type ExportButtonProps = { target: string; className: string; text: string; onClick: () => void; props: ToolbarProps };
+
+/** One export button; while its export loads it shows the busy label and a click cancels. */
+function ExportButton({ target, className, text, onClick, props }: ExportButtonProps) {
+  const busy = props.exportBusy === target;
+  const disabled = !busy && (Boolean(props.exportDisabled) || Boolean(props.exportBusy));
+  return (
+    <button type="button" className={`btt-export ${className}`} disabled={disabled} aria-busy={busy || undefined} onClick={onClick}>
+      {busy ? props.labels.exportBusy : text}
+    </button>
+  );
+}
+
+function ExportButtons(props: ToolbarProps) {
+  const { labels, onExportCsv, exportFormats, onExport, exportStatus } = props;
   const formats = onExport ? (exportFormats ?? []) : [];
   if (!onExportCsv && formats.length === 0) return null;
   return (
     <div className="btt-exports">
-      {onExportCsv && (
-        <button type="button" className="btt-export btt-export--csv" disabled={exportDisabled} onClick={onExportCsv}>
-          {labels.exportCsv}
-        </button>
-      )}
+      {onExportCsv && <ExportButton target={exportTarget()} className="btt-export--csv" text={labels.exportCsv} onClick={onExportCsv} props={props} />}
       {formats.map((format) => (
-        <button key={format} type="button" className={`btt-export btt-export--${format}`} disabled={exportDisabled} onClick={() => onExport?.(format)}>
-          {fillLabel(labels.exportFormat, { format: format.toUpperCase() })}
-        </button>
+        <ExportButton
+          key={format}
+          target={exportTarget(format)}
+          className={`btt-export--${format}`}
+          text={fillLabel(labels.exportFormat, { format: format.toUpperCase() })}
+          onClick={() => onExport?.(format)}
+          props={props}
+        />
       ))}
+      {exportStatus !== undefined && (
+        <span className="btt-export-status" role="status">
+          {exportStatus}
+        </span>
+      )}
     </div>
   );
 }

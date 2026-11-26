@@ -3,12 +3,13 @@ import { toCsv } from '../core/export';
 import { isFilterActive } from '../core/filters';
 import type { CounterData } from '../core/pagination';
 import type { Column, ExportData, FilterState, FilterValue } from '../core/types';
+import { type AllRowsExport, type ExportRunner, useExportRunner } from '../hooks/useExportRunner';
 import type { Selection } from '../hooks/useSelection';
 import type { BTTableLabels } from '../labels';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FilterPanel } from './FilterPanel';
 import { Pagination } from './Pagination';
-import { Toolbar } from './Toolbar';
+import { exportTarget, Toolbar } from './Toolbar';
 
 /** Table props of the toolbar and footer controls. */
 export type ControlProps = {
@@ -20,13 +21,17 @@ export type ControlProps = {
   pageSizeOptions?: readonly number[];
   /** "Showing 1–100 of 2,345" / "No records" in the toolbar. Default `true`. */
   showCounter?: boolean;
-  /** A CSV button that downloads every filtered row (server mode: the rows of the current page). Default `false`. */
+  /**
+   * A CSV button that downloads every filtered row (server and manual mode: the rows of the
+   * current page, or every filtered row through `fetchAllRows`). Default `false`.
+   */
   exportCsv?: boolean;
   /** Default `'table.csv'`. */
   exportFileName?: string;
   /**
-   * Called by the `exportFormats` buttons with every filtered row (server mode: the rows of the
-   * current page), for caller-side PDF or spreadsheet writers.
+   * Called by the `exportFormats` buttons with every filtered row (server and manual mode: the
+   * rows of the current page, or every filtered row through `fetchAllRows`), for caller-side
+   * PDF or spreadsheet writers.
    */
   onExport?: (format: string, data: ExportData) => void;
   /** Extra export format names, one toolbar button each, calling `onExport`. Default `[]`. */
@@ -49,7 +54,7 @@ export type ControlProps = {
 };
 
 /** State and actions the controls read, whatever the data mode. */
-export type TableControls<R = unknown> = {
+export type TableControls<R = unknown> = AllRowsExport & {
   searchInput: string;
   setSearch: (text: string) => void;
   /** Empties the search and applies it at once, skipping any debounce. */
@@ -107,15 +112,30 @@ function downloadCsv(fileName: string, csv: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function toolbarActions<R>(props: ControlsInput<R>) {
+/**
+ * The export button actions: with `exportAll` the rows load first (through `runner`, which
+ * also cancels), else the payload is built at once from the rows at hand.
+ */
+function exportActions<R>(props: ControlsInput<R>, runner: ExportRunner) {
   const { controls, onExport } = props;
   const fileName = props.exportFileName ?? 'table.csv';
-  return {
-    onExportCsv: props.exportCsv ? () => downloadCsv(fileName, toCsv(controls.exportData())) : undefined,
-    onExport: onExport && ((format: string) => onExport(format, controls.exportData())),
-    exportDisabled: Boolean(props.loading) || controls.exportRowCount === 0,
-    onClearAll: props.clearAll !== false && isNarrowed(props) ? controls.clearAll : undefined,
+  const start = (target: string, deliver: (data: ExportData) => void) => {
+    if (controls.exportAll) runner.run(target, deliver);
+    else deliver(controls.exportData());
   };
+  const csv = () => start(exportTarget(), (data) => downloadCsv(fileName, toCsv(data)));
+  return {
+    onExportCsv: props.exportCsv ? csv : undefined,
+    onExport: onExport && ((format: string) => start(exportTarget(format), (data) => onExport(format, data))),
+    exportDisabled: Boolean(props.loading) || controls.exportRowCount === 0,
+    exportBusy: runner.busy,
+    exportStatus: controls.exportAll ? exportStatus(runner, props.labels) : undefined,
+  };
+}
+
+/** The export status line: the failure message after a failed every-row export, else empty. */
+function exportStatus(runner: ExportRunner, labels: BTTableLabels): string {
+  return runner.failed ? labels.exportError : '';
 }
 
 /** True while the search box holds text or any column filter is active. */
@@ -124,9 +144,13 @@ function isNarrowed<R>({ columns, controls }: ControlsInput<R>): boolean {
   return columns.some((column) => column.filter !== undefined && isFilterActive(column.filter, controls.filters[column.key]));
 }
 
-/** The filters panel and the toolbar above the table, each behind an error boundary. */
+/**
+ * The filters panel and the toolbar above the table, each behind an error boundary. Owns the
+ * every-row export (`exportAll`): unmounting aborts it.
+ */
 export function TopControls<R>(props: ControlsInput<R>) {
   const { controls, labels } = props;
+  const runner = useExportRunner({ exportAll: controls.exportAll, exportKey: controls.exportKey, onError: props.onError });
   const fallback = <div className="btt-error" role="alert">{labels.error}</div>;
   const search = {
     value: controls.searchInput,
@@ -147,7 +171,8 @@ export function TopControls<R>(props: ControlsInput<R>) {
         counterHelp={controls.counterHelp}
         exportFormats={props.exportFormats}
         extras={props.toolbarExtras}
-        {...toolbarActions(props)}
+        onClearAll={props.clearAll !== false && isNarrowed(props) ? controls.clearAll : undefined}
+        {...exportActions(props, runner)}
       />
     </>
   );

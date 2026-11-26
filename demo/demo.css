@@ -133,3 +133,14 @@ body {
   cursor: default;
   opacity: 0.6;
 }
+
+.demo-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.demo-detail dd {
+  margin: 0;
+}

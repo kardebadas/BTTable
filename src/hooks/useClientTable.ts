@@ -4,6 +4,7 @@ import type { Column, FilterState, SortState } from '../core/types';
 import { buildEntries, filterEntries, type RowEntry, type RowId, type RowSource, sortEntries } from './rowModel';
 import type { TableState } from './tableReducer';
 import { useLatest } from './useLatest';
+import { type Expansion, type ExpansionProps, useExpansion } from './useExpansion';
 import { type Selection, type SelectionChange, useSelection } from './useSelection';
 import { type ApplyAction, type TableActions, useTableState } from './useTableState';
 import type { ViewStateProps } from './viewState';
@@ -19,7 +20,8 @@ export type ClientTableState<R> = {
 };
 
 /** Input of `useClientTable`; the client-mode subset of the table props. */
-export type UseClientTableOptions<R> = ViewStateProps & {
+export type UseClientTableOptions<R> = ViewStateProps &
+  ExpansionProps<R> & {
   /** An array, or an object map whose keys are the id fallback. */
   rows: RowSource<R>;
   /** Should be stable (memoized): a new array re-filters and re-sorts every row. */
@@ -62,6 +64,8 @@ export type ClientTable<R> = TableActions & {
   /** The rows of the current page (all filtered rows when pagination is off). */
   pageRows: RowEntry<R>[];
   selection: Selection<R>;
+  /** Expanded detail rows; ids of rows gone from `rows` are pruned like selected ids. */
+  expansion: Expansion;
 };
 
 function sameState<R>(a: ClientTableState<R>, b: ClientTableState<R>): boolean {
@@ -124,6 +128,7 @@ export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTabl
   const scopeIds = useMemo(() => sorted.map((entry) => entry.id), [sorted]);
   const { selectedIds, defaultSelectedIds, onSelectionChange } = options;
   const selection = useSelection({ scopeIds, presentIds, selectedIds, defaultSelectedIds, onSelectionChange, entries, enabled: Boolean(options.selectable) });
+  const expansion = useExpansion(options, presentIds);
 
   return {
     ...actions,
@@ -140,5 +145,6 @@ export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTabl
     filteredRows: sorted,
     pageRows,
     selection,
+    expansion,
   };
 }

@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import { BTTable, type FetchRows, type Query } from '../src';
+import { BTTable, type FetchAllRows, type FetchRows, type Query } from '../src';
 import { COLUMNS, type DemoRow, generateRows } from './data';
-import { fakeFetch, LATENCY_MS } from './fakeServer';
+import { fakeFetch, fakeFetchAll, LATENCY_MS } from './fakeServer';
 
 const SERVER_ROWS = generateRows(20_000, 7);
+const fetchAllRows: FetchAllRows<DemoRow> = (query, { signal }) => fakeFetchAll({ rows: SERVER_ROWS, columns: COLUMNS, query, signal });
 
 type ServerButtonsProps = { armed: boolean; onFail: () => void; onRefresh: () => void; onReset: () => void };
 
@@ -22,8 +23,9 @@ function ServerButtons({ armed, onFail, onRefresh, onReset }: ServerButtonsProps
 
 /**
  * Server mode against an in-memory backend: every page, search, filter and sort goes
- * through `fetchRows`. Buttons make the next request fail, refetch (`refreshKey`) and reset
- * search and filters (`resetKey`); the last query sent is shown below the table.
+ * through `fetchRows`; CSV exports every filtered row through `fetchAllRows`. Buttons make
+ * the next request fail, refetch (`refreshKey`) and reset search and filters (`resetKey`);
+ * the last query sent is shown below the table.
  */
 export function ServerDemo({ themeClass }: { themeClass?: string }) {
   const failNext = useRef(false);
@@ -53,7 +55,7 @@ export function ServerDemo({ themeClass }: { themeClass?: string }) {
         pageSize={50}
         selectable
         exportCsv
-        exportFileName="bttable-server-page.csv"
+        fetchAllRows={fetchAllRows}
         caption="Rows from the fake server"
         className={themeClass}
         maxHeight={520}

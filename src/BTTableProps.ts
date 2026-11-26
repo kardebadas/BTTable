@@ -1,10 +1,11 @@
 import type { ErrorInfo, ReactNode } from 'react';
 import type { ControlProps } from './components/Controls';
 import type { RowCallbacks } from './components/TableBody';
-import type { Column, FetchRows, Query } from './core/types';
+import type { Column, FetchAllRows, FetchRows, Query } from './core/types';
 import type { VirtualizeMode } from './core/virtual';
 import type { RowId, RowSource } from './hooks/rowModel';
 import type { ClientTableState } from './hooks/useClientTable';
+import type { ExpansionProps } from './hooks/useExpansion';
 import type { RowLifecycleProps } from './hooks/useRowLifecycle';
 import type { SelectionChange } from './hooks/useSelection';
 import type { ViewStateProps } from './hooks/viewState';
@@ -16,6 +17,7 @@ export type SelectionBarContext<R> = { selectedIds: RowId[]; selectedRows: R[]; 
 /** Props of `BTTable` shared by every data mode. */
 export type BTTableCommonProps<R> = RowCallbacks<R> &
   RowLifecycleProps<R> &
+  ExpansionProps<R> &
   ControlProps &
   ViewStateProps & {
   /** Should be stable (memoized): a new array re-derives and re-renders every row on every parent render. */
@@ -96,13 +98,22 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
  * re-sorts every row; it keeps the scroll position unless the view (page, sort, search,
  * filters) changes.
  */
-export type BTTableClientProps<R> = BTTableCommonProps<R> & { rows: RowSource<R>; fetchRows?: never } & NoManualProps;
+export type BTTableClientProps<R> = BTTableCommonProps<R> & { rows: RowSource<R>; fetchRows?: never; fetchAllRows?: never } & NoManualProps;
+
+/**
+ * Server and manual mode: loads every row matching the current search, filters and sort
+ * (the query without paging) when an export button is clicked, so CSV and `onExport` cover
+ * every filtered row. While it loads the button shows `labels.exportBusy`; a second click,
+ * a query change or unmounting aborts it, and a failure calls `onError` and shows
+ * `labels.exportError`. Without it, exports cover the current page only.
+ */
+type AllRowsProps<R> = { fetchAllRows?: FetchAllRows<R> };
 
 /**
  * Server mode: the data source, called for each page. A new function identity does not
  * refetch: change `refreshKey` to refetch (e.g. when the fetcher captures a tenant id).
  */
-export type BTTableServerProps<R> = BTTableCommonProps<R> & { fetchRows: FetchRows<R>; rows?: never } & NoManualProps;
+export type BTTableServerProps<R> = BTTableCommonProps<R> & AllRowsProps<R> & { fetchRows: FetchRows<R>; rows?: never } & NoManualProps;
 
 /** The manual-mode props, absent in the other modes. */
 type NoManualProps = { mode?: never; totalRows?: never; totalFilteredRows?: never };
@@ -114,7 +125,8 @@ type NoManualProps = { mode?: never; totalRows?: never; totalFilteredRows?: neve
  * count the rows up to this page and offer a next page after a full one. Pass `loading`
  * while a page loads; dropping stale responses is the parent's job.
  */
-export type BTTableManualProps<R> = BTTableCommonProps<R> & {
+export type BTTableManualProps<R> = BTTableCommonProps<R> &
+  AllRowsProps<R> & {
   mode: 'manual';
   rows: RowSource<R>;
   fetchRows?: never;
@@ -132,7 +144,8 @@ export type BTTableManualProps<R> = BTTableCommonProps<R> & {
 export type BTTableProps<R> = BTTableClientProps<R> | BTTableServerProps<R> | BTTableManualProps<R>;
 
 /** The props as the table reads them inside: any mode, checked at runtime. */
-export type BTTableAnyProps<R> = BTTableCommonProps<R> & {
+export type BTTableAnyProps<R> = BTTableCommonProps<R> &
+  AllRowsProps<R> & {
   rows?: RowSource<R>;
   fetchRows?: FetchRows<R>;
   mode?: 'manual';

@@ -1,9 +1,9 @@
-import { forwardRef, type ReactElement, type Ref, type RefAttributes, useRef } from 'react';
+import { forwardRef, type ReactElement, type Ref, type RefAttributes, useId, useRef } from 'react';
 import { cx } from './components/classNames';
-import { ColGroup, tableMinWidth, toCssSize } from './components/ColGroup';
+import { ColGroup, leadingCount, tableMinWidth, toCssSize } from './components/ColGroup';
 import { FooterControls, type TableControls, TopControls } from './components/Controls';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { TableBody } from './components/TableBody';
+import { type RowExpansion, TableBody } from './components/TableBody';
 import { TableHead } from './components/TableHead';
 import { buildExportData } from './core/export';
 import { getCounter } from './core/pagination';
@@ -12,6 +12,8 @@ import { ownRowId } from './core/values';
 import { shouldVirtualize } from './core/virtual';
 import type { RowEntry, RowId, RowSource } from './hooks/rowModel';
 import { type ClientTable as ClientTableModel, useClientTable } from './hooks/useClientTable';
+import type { Expansion } from './hooks/useExpansion';
+import { allRowsExport } from './hooks/useExportRunner';
 import { useManualTable } from './hooks/useManualTable';
 import type { PagedTable } from './hooks/usePagedTable';
 import { useServerTable } from './hooks/useServerTable';
@@ -34,6 +36,8 @@ type ViewProps<R> = ContentProps<R> & {
   controls?: TableControls<R>;
   /** Client mode: the page showing a row, null when it is filtered out. */
   findPage?: (id: RowId) => number | null;
+  /** The expanded detail rows (`renderDetail`). */
+  expansion?: Expansion;
 };
 
 /** The status strip always keeps one line of height, so loading never shifts the table. */
@@ -69,7 +73,7 @@ function useTableVirtualization<R>(props: ViewProps<R>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const enabled = shouldVirtualize({ virtualize, maxHeight, rowCount: entries.length, threshold: virtualizeThreshold });
   const estimatedRowHeight = rowEstimate(props.estimatedRowHeight);
-  const virtual = useVirtualRows({ entries, viewKey, enabled, estimatedRowHeight, scrollRef });
+  const virtual = useVirtualRows({ entries, viewKey, enabled, estimatedRowHeight, scrollRef, expandedIds: props.expansion?.expandedIds });
   return { scrollRef, enabled, virtual, maxHeight };
 }
 
@@ -86,6 +90,7 @@ function useScrollHandle<R>(props: ViewProps<R>, { scrollRef, enabled, virtual, 
     viewKey: props.viewKey,
     columns: props.columns,
     selectable: Boolean(props.selectable),
+    expandable: Boolean(props.renderDetail),
     elements: lifecycle.elements,
     virtual: { enabled, offsets: virtual.offsets, jumpTo: virtual.jumpTo },
     page: controls?.page ?? 1,
@@ -106,6 +111,12 @@ function selectionControls<R>({ controls, selectable, labels }: ViewProps<R>) {
   };
 }
 
+/** The detail toggle column and detail rows, when `renderDetail` is given and there is expansion state. */
+function expansionControls<R>({ renderDetail, expansion, labels }: ViewProps<R>, idPrefix: string): RowExpansion<R> | undefined {
+  if (!renderDetail || !expansion) return undefined;
+  return { isExpanded: expansion.isExpanded, toggleRow: expansion.toggleRow, label: labels.rowDetails, renderDetail, idPrefix };
+}
+
 const MAX_SKELETON_ROWS = 8;
 
 /** Skeleton rows while the first rows load: the page size, at most 8. */
@@ -115,11 +126,11 @@ function skeletonCount(pageSize: number | undefined): number {
 }
 
 /** The body shown when rendering the rows fails. */
-function bodyFallback<R>({ columns, selectable, labels, tbodyClassName }: ViewProps<R>) {
+function bodyFallback<R>({ columns, selectable = false, renderDetail, labels, tbodyClassName }: ViewProps<R>) {
   return (
     <tbody className={tbodyClassName}>
       <tr>
-        <td className="btt-error" role="alert" colSpan={columns.length + (selectable ? 1 : 0)}>
+        <td className="btt-error" role="alert" colSpan={columns.length + leadingCount({ selectable, expandable: Boolean(renderDetail) })}>
           {labels.error}
         </td>
       </tr>
@@ -127,31 +138,39 @@ function bodyFallback<R>({ columns, selectable, labels, tbodyClassName }: ViewPr
   );
 }
 
+/** The `<thead>` and `<tbody>` props of `TableScroll`. */
+function tableParts<R>(props: ViewProps<R>, range: ReturnType<typeof useVirtualRows>['range'], idPrefix: string) {
+  const { columns, entries, selectable = false, loading = false, emptyMessage = 'No records found', showTableHeader = true } = props;
+  const { selectAll, rowSelection } = selectionControls(props);
+  const expansion = expansionControls(props, idPrefix);
+  const headerRows = showTableHeader ? 1 : 0;
+  const head = { columns, sort: props.sort, onSort: props.onSort, selectable, selectAll, className: props.theadClassName, expandLabel: expansion?.label };
+  const skeletonRows = skeletonCount(props.controls?.pageSize);
+  const body = { entries, columns, selectable, loading, emptyMessage, range, selection: rowSelection, headerRows, skeletonRows, expansion };
+  return { head, body, headerRows, expandable: expansion !== undefined };
+}
+
 /** The scroll container and the table: fixed layout, sticky header (unless hidden), rows virtualized when on. */
 function TableScroll<R>(props: ViewProps<R>) {
-  const { columns, entries, selectable = false, loading = false, emptyMessage = 'No records found', showTableHeader = true } = props;
+  const { columns, entries, selectable = false, loading = false, showTableHeader = true } = props;
   const scroll = useTableVirtualization(props);
   const { scrollRef, enabled, maxHeight } = scroll;
   const lifecycle = useRowLifecycle(props);
   useScrollHandle(props, { ...scroll, lifecycle });
-  const { selectAll, rowSelection } = selectionControls(props);
-  const headerRows = showTableHeader ? 1 : 0;
+  const { head, body, headerRows, expandable } = tableParts(props, scroll.virtual.range, useId());
   // Collapsed borders: no border-spacing between rows, so rows sit exactly at their measured offsets.
-  const tableStyle = { tableLayout: 'fixed', borderCollapse: 'collapse', width: '100%', minWidth: tableMinWidth(columns, selectable) } as const;
+  const tableStyle = { tableLayout: 'fixed', borderCollapse: 'collapse', width: '100%', minWidth: tableMinWidth(columns, selectable, expandable) } as const;
   // A stable gutter keeps the vertical scrollbar from taking width from the columns when it appears.
   // Virtualization keeps the view anchored itself, so the browser's scroll anchoring must not also adjust it.
   const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(maxHeight), overflowAnchor: enabled ? 'none' : undefined } as const;
-  const head = { columns, sort: props.sort, onSort: props.onSort, selectable, selectAll, className: props.theadClassName };
-  const skeletonRows = skeletonCount(props.controls?.pageSize);
-  const body = { entries, columns, selectable, loading, emptyMessage, range: scroll.virtual.range, selection: rowSelection, headerRows, skeletonRows, lifecycle };
   return (
     <div className="btt-scroll" style={scrollStyle} ref={scrollRef}>
       <table className={cx('btt-table', props.tableClassName)} style={tableStyle} aria-busy={loading} aria-rowcount={entries.length + headerRows}>
         {props.caption !== undefined && <caption className="btt-caption">{props.caption}</caption>}
-        <ColGroup columns={columns} selectable={selectable} />
+        <ColGroup columns={columns} selectable={selectable} expandable={expandable} />
         {showTableHeader && <TableHead {...head} />}
         <ErrorBoundary fallback={bodyFallback(props)} onError={props.onError} resetKey={entries}>
-          <TableBody {...body} className={props.tbodyClassName} rowClassName={props.rowClassName} rowProps={props.rowProps} rowTone={props.rowTone} />
+          <TableBody {...body} className={props.tbodyClassName} rowClassName={props.rowClassName} rowProps={props.rowProps} rowTone={props.rowTone} lifecycle={lifecycle} />
         </ErrorBoundary>
       </table>
     </div>
@@ -206,7 +225,7 @@ function ClientTable<R>(props: ContentProps<R> & { rows: RowSource<R> }) {
   useRowWarnings(props.rows, table.entries, props.getRowId);
   const controls = clientControls(table, props);
   const findPage = (id: RowId) => clientPageOf(table, props.pagination !== false, id);
-  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort, findPage };
+  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort, findPage, expansion: table.expansion };
   return <TableView {...props} {...view} controls={controls} />;
 }
 
@@ -224,23 +243,27 @@ function LoadError({ labels, onRetry }: { labels: BTTableLabels; onRetry: () => 
 
 /**
  * Controls of server and manual mode. Export (CSV and `onExport`) covers the rows of the
- * current page only: the other pages live on the server.
+ * current page, since the other pages live on the server, unless `fetchAllRows` loads every
+ * filtered row on click.
  */
 function serverControls<R>(table: PagedTable<R>, props: ContentProps<R>): TableControls<R> {
   const exportData = () => buildExportData(props.columns, table.pageRows.map((entry) => entry.row));
-  return { ...table, exportData, exportRowCount: table.pageRows.length, counterHelp: true };
+  const allRows = allRowsExport(table.query, props.columns, props.fetchAllRows);
+  return { ...table, ...allRows, exportData, exportRowCount: table.pageRows.length, counterHelp: true };
 }
 
-/** Development warnings of server and manual mode: ignored `pagination={false}` and selectable rows without ids. */
+/** Development warnings of server and manual mode: ignored `pagination={false}`, and selectable or expandable rows without ids. */
 function useServerWarnings<R>(props: ContentProps<R>, pageRows: readonly RowEntry<R>[]): void {
   const [mode, source] = props.mode === 'manual' ? ['manual', 'the parent'] : ['server', 'fetchRows'];
   useWarnOnce(props.pagination === false, `BTTable: pagination={false} is ignored in ${mode} mode; pages always come from ${source}.`);
   // Rows given as a map take their ids from the keys.
   const isMap = Boolean(props.rows) && !Array.isArray(props.rows);
-  const missingIds = Boolean(props.selectable) && !props.getRowId && !isMap && pageRows.some((entry) => ownRowId(entry.row) === undefined);
+  // Selected and expanded ids are kept across pages, so index ids would hit the same position on the next page.
+  const keepsIds = Boolean(props.selectable) || Boolean(props.renderDetail);
+  const missingIds = keepsIds && !props.getRowId && !isMap && pageRows.some((entry) => ownRowId(entry.row) === undefined);
   useWarnOnce(
     missingIds,
-    'BTTable: selectable paged rows need ids: give rows an id/ID/INDEX/N_ID field or pass getRowId, or selections collide across pages.',
+    'BTTable: selectable or expandable (renderDetail) paged rows need ids: give rows an id/ID/INDEX/N_ID field or pass getRowId, or selected and expanded rows collide across pages.',
   );
 }
 
@@ -250,7 +273,7 @@ function ServerTable<R>(props: ContentProps<R> & { fetchRows: FetchRows<R> }) {
   useRowWarnings(table.responseRows, table.pageRows, props.getRowId);
   const loading = Boolean(props.loading) || table.loading;
   const emptyMessage = table.error ? <LoadError labels={props.labels} onRetry={table.retry} /> : props.emptyMessage;
-  const view = { entries: table.pageRows, viewKey: table.viewKey, loading, emptyMessage, sort: table.sort, onSort: table.toggleSort, pagination: true };
+  const view = { entries: table.pageRows, viewKey: table.viewKey, loading, emptyMessage, sort: table.sort, onSort: table.toggleSort, pagination: true, expansion: table.expansion };
   return <TableView {...props} {...view} controls={serverControls(table, props)} />;
 }
 
@@ -261,7 +284,7 @@ function ManualTable<R>(props: ManualContentProps<R>) {
   const table = useManualTable(props);
   useServerWarnings(props, table.pageRows);
   useRowWarnings(props.rows, table.pageRows, props.getRowId);
-  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort, pagination: true };
+  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort, pagination: true, expansion: table.expansion };
   return <TableView {...props} {...view} controls={serverControls(table, props)} />;
 }
 

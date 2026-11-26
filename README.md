@@ -25,6 +25,7 @@ mounted.
 - [Server mode](#server-mode)
 - [Manual mode](#manual-mode)
 - [Selection](#selection)
+- [Detail rows](#detail-rows)
 - [Export](#export)
 - [Layout, virtualization and performance](#layout-virtualization-and-performance)
 - [Imperative handle (ref)](#imperative-handle-ref)
@@ -237,6 +238,7 @@ or the load error has the class `btt-empty-row` instead.
 | `columns` | required | Column definitions. Keep the array stable (module-level or `useMemo`). |
 | `rows` | – | Client mode data: an array or an object map (keys are the id fallback). Keep the array stable: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
 | `fetchRows` | – | Server mode data source; see [Server mode](#server-mode). A new function identity does not refetch. |
+| `fetchAllRows` | – | Server and manual mode: `(query, { signal }) => Promise<R[]>`, every row matching the query without paging, so exports cover every filtered row; see [Export](#export). Ignored in client mode. |
 | `mode` | – | `"manual"`: the parent loads each page; see [Manual mode](#manual-mode). |
 | `totalRows` / `totalFilteredRows` | – | Manual mode only: the totals of the page the parent passes. |
 | `getRowId` | `id`/`ID`/`INDEX`/`N_ID`, else map key, else index | Row id; see [Rows and ids](#rows-and-ids). |
@@ -292,7 +294,9 @@ each callback fires on every change the table makes, controlled or not.
 | `exportFormats` | `[]` | Extra format names (e.g. `['pdf', 'xlsx']`): one button each, shown only with `onExport`, labelled by the `exportFormat` label (default: the name in upper case). |
 | `onExport` | – | `(format, data) => void`, called by the `exportFormats` buttons; see [Export](#export). |
 
-Export buttons are disabled while loading and when there is no row to export.
+Export buttons are disabled while loading and when there is no row to export. In server and
+manual mode they export the current page only, unless `fetchAllRows` is given (see
+[Export](#export)).
 
 ### Selection
 
@@ -303,6 +307,15 @@ Export buttons are disabled while loading and when there is no row to export.
 | `defaultSelectedIds` | – | Initial selection when uncontrolled. |
 | `onSelectionChange` | – | `(ids, rows) => void` after every change; `rows` are the selected rows the table knows (see [Selection](#selection)). |
 | `renderSelectionBar` | – | `({ selectedIds, selectedRows, clear }) => node`: a bar between the toolbar and the table, shown while at least one row is selected. |
+
+### Detail rows
+
+| Prop | Default | Meaning |
+| --- | --- | --- |
+| `renderDetail` | – | `({ row, rowId }) => node`: adds a leading toggle column; an expanded row shows this content in a row right under it. Keep it stable. See [Detail rows](#detail-rows). |
+| `expandedIds` | – | Controlled expanded rows (array of row ids; several can be open at once). |
+| `defaultExpandedIds` | – | Initially expanded rows when uncontrolled. |
+| `onExpandedChange` | – | `(ids) => void` after every change. |
 
 ### Layout and state
 
@@ -322,7 +335,7 @@ Export buttons are disabled while loading and when there is no row to export.
 | `tbodyClassName` | – | Extra class on the `<tbody>`. |
 | `labels` | English | Partial override of every UI string; see [Labels](#labels-i18n). |
 | `locale` | runtime locale | Locale of the counter and page-count numbers (e.g. `'en-US'`). Pass a fixed one when server rendering; see [Server-side rendering](#server-side-rendering). |
-| `onError` | – | `(error, info) => void` when a render error is caught by the table's error boundary. |
+| `onError` | – | `(error, info) => void` when a render error is caught by the table's error boundary, or when `fetchAllRows` fails (`info.componentStack` is then empty). |
 
 ### Callbacks per mode
 
@@ -505,8 +518,8 @@ Behaviour:
 - **Invalid rows.** Entries of `rows` that are `null` or not objects are skipped, with one
   development warning per response.
 - **Pagination is always on.** `pagination={false}` is ignored (development warning).
-- **Export covers the current page only**, and select-all selects the current page; see
-  [Export](#export) and [Selection](#selection).
+- **Export covers the current page only** unless you pass `fetchAllRows`, and select-all
+  selects the current page; see [Export](#export) and [Selection](#selection).
 
 ## Manual mode
 
@@ -578,7 +591,7 @@ Rules shared with server mode:
   query (at mount, or before a URL changes page and filters) never clamp it.
 - **Pagination is always on** (`pagination={false}` is ignored, development warning),
   select-all selects the current page, selected ids on other pages stay selected, and export
-  covers the current page only.
+  covers the current page only unless you pass `fetchAllRows`.
 - **Controlled view state** works as in the other modes: a parent that ignores a proposed
   change sees no new query.
 
@@ -622,10 +635,41 @@ one row is selected:
 />;
 ```
 
+## Detail rows
+
+`renderDetail` adds a leading toggle column. Each toggle is a real `<button>` named by the
+`rowDetails` label, with `aria-expanded`, and `aria-controls` pointing at the detail row while
+it is open; clicking it never triggers the row's own `onClick`. An expanded row is followed by
+a `tr.btt-detail-row` holding one cell that spans every column (toggle and selection columns
+included) with your content. Several rows can be open at once.
+
+```tsx
+const renderDetail = useCallback(({ row }: { row: Person }) => <PersonCard person={row} />, []);
+
+<BTTable columns={columns} rows={people} renderDetail={renderDetail} defaultExpandedIds={[7]} />;
+```
+
+Use `expandedIds` + `onExpandedChange` to control which rows are open, or
+`defaultExpandedIds` for uncontrolled. Expanded ids follow the selection rules: in client mode
+an id whose row disappears from `rows` is dropped (not when `rows` becomes empty); in server
+and manual mode ids on other pages are kept, so a row is open again when its page comes back.
+Removing `renderDetail` closes every row (reported once through `onExpandedChange`).
+In server and manual mode rows need real ids (an `id`/`ID`/`INDEX`/`N_ID` field or
+`getRowId`), as for selection: with index ids, an open row would open the same position on the
+next page. Rows without ids get a development warning.
+
+Detail rows are not data rows: they never get the `btt-row` class, striping, tones,
+`rowProps` or `aria-rowindex`, and column widths do not change (the toggle column has a fixed
+40 px `<col>`). With virtualization a data row and its detail row are measured as one unit,
+so offsets, `scrollToRow` (all alignments fit the row with its open detail) and the mounted
+window stay right while details open, close or resize. A row opened or closed while it is
+scrolled out of the mounted window (controlled `expandedIds`) uses `estimatedRowHeight` until
+it is measured again.
+
 ## Export
 
-`exportCsv` adds a CSV button that downloads every filtered, sorted row (server mode: the rows
-of the current page) as `exportFileName`. The file is UTF-8 with a byte order mark, RFC 4180
+`exportCsv` adds a CSV button that downloads every filtered, sorted row (server and manual
+mode: the rows of the current page, unless `fetchAllRows` is given) as `exportFileName`. The file is UTF-8 with a byte order mark, RFC 4180
 (every field quoted, CRLF line ends), and text starting with `=`, `+`, `-`, `@`, tab or
 carriage return is prefixed with `'` so spreadsheets do not run it as a formula.
 
@@ -644,6 +688,27 @@ type ExportData = { headers: string[]; rows: (string | number)[][] };
   }}
 />;
 ```
+
+In server and manual mode only the current page is loaded, so by default CSV and `onExport`
+cover that page. Pass `fetchAllRows` to export every filtered row instead: on click the table
+calls it with the current query without `page` and `pageSize` (`ExportQuery`: search, sort,
+filters) and exports the rows it resolves to.
+
+```tsx
+const fetchAllRows: FetchAllRows<Person> = async (query, { signal }) => {
+  const response = await fetch('/api/people/all', { method: 'POST', body: JSON.stringify(query), signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json(); // Person[]
+};
+
+<BTTable columns={columns} fetchRows={fetchRows} fetchAllRows={fetchAllRows} exportCsv />;
+```
+
+While the rows load, the clicked button has `aria-busy="true"` and the `exportBusy` label, and
+the other export buttons are disabled. Clicking it again cancels (the `signal` aborts); so do
+a change of search, filters or sort, and unmounting the table. A cancelled or outdated result
+is never exported. A failure calls `onError(error, info)` and shows the `exportError` label in
+a `role="status"` line next to the buttons, cleared by the next export.
 
 Headers are each column's `headerText`. Cells come from `exportValue` (default `value`):
 finite numbers stay numbers, dates become `yyyy-mm-dd` (or a full ISO timestamp when they
@@ -666,9 +731,10 @@ carry a time of day), everything else becomes its display text, never a React no
   place: a new `rows` array (polling), new `columns` or `getRowId`, and in server mode a
   `refreshKey` refetch, a Retry or any answer to the same query. In server mode the reset
   happens when the response for the new view arrives.
+- A data row and its open detail row (`renderDetail`) are measured as one unit.
 
 **Keep these props stable** (module-level constants, `useMemo` or `useCallback`):
-`columns`, `rows`, `getRowId`, `rowClassName`, `rowProps`, `rowTone`. Rows are memoized on their
+`columns`, `rows`, `getRowId`, `rowClassName`, `rowProps`, `rowTone`, `renderDetail`. Rows are memoized on their
 identity: a new `columns` array or callback re-renders every row, and a new `rows` array or
 `getRowId` re-filters, re-sorts and re-derives the whole list on every parent render.
 
@@ -725,6 +791,8 @@ runtime locale). `DEFAULT_LABELS` (exported, frozen) holds the English defaults.
 | `clearAll` | `Clear all` |
 | `exportCsv` | `CSV` |
 | `exportFormat` | `{format}` (the `exportFormats` name in upper case) |
+| `exportBusy` | `Exporting… (cancel)` (the export button while `fetchAllRows` loads) |
+| `exportError` | `The export failed.` (status after `fetchAllRows` failed) |
 | `pagination` | `Pagination` |
 | `previousPage` | `Previous` |
 | `nextPage` | `Next` |
@@ -733,6 +801,7 @@ runtime locale). `DEFAULT_LABELS` (exported, frozen) holds the English defaults.
 | `pageSize` | `Rows per page` |
 | `selectAll` | `Select all` |
 | `selectRow` | `Select row` |
+| `rowDetails` | `Row details` (the detail toggle buttons and their header cell) |
 | `filters` | `Filters` |
 | `filterAll` | `All` |
 | `filterFrom` | `from` |
@@ -794,6 +863,11 @@ Do not give `th`/`td` widths of your own: column widths come from `columns` only
 - Sortable headers are real `<button>`s inside `<th aria-sort>`; node headers get an
   accessible name from `headerText`.
 - Row and select-all checkboxes are labelled ("Select row", "Select all").
+- Detail toggles (`renderDetail`) are buttons labelled "Row details" with `aria-expanded`
+  and, while open, `aria-controls` naming their detail row; the toggle column's header cell
+  carries the same name for screen readers. Detail rows have no `aria-rowindex`.
+- An export loading every row (`fetchAllRows`) sets `aria-busy` on its button; a failure is
+  announced through a `role="status"` line.
 - `aria-busy` is set on the table while loading; the status strip is
   `role="status" aria-live="polite"`. Skeleton rows are hidden from assistive technology,
   and their shimmer runs only without `prefers-reduced-motion: reduce`.
@@ -840,7 +914,7 @@ error tints (without them, no tint).
 Besides `BTTable` and its types (`BTTableProps`, `BTTableClientProps`, `BTTableServerProps`,
 `BTTableCommonProps`, `SelectionBarContext`, `Column`, `CellContext`, `FilterSpec`,
 `FilterState`, `FilterValue`, `FilterType`, `FilterRowsInput`, `QueryState`, `Option`, `TextOp`, `NumberOp`, `DateOp`, `SortState`, `Query`,
-`FetchResult`, `FetchRows`, `ExportData`, `RowId`, `RowSource`, `CellHandler`, `RowAttributes`, `ClientTableState`,
+`FetchResult`, `FetchRows`, `FetchAllRows`, `ExportQuery`, `ExportData`, `DetailContext`, `RowId`, `RowSource`, `CellHandler`, `RowAttributes`, `ClientTableState`,
 `BTTableHandle`, `RowAlign`, `RowTone`, `RowMount`, `RowUnmount`,
 `BTTableLabels`, `VirtualizeMode`), the package exports `DEFAULT_LABELS` and the helpers it
 uses itself:

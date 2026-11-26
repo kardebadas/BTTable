@@ -5,6 +5,7 @@ import type { RowEntry, RowId } from '../hooks/rowModel';
 import { type RowLifecycle, useRowEffects } from '../hooks/useRowLifecycle';
 import { Cell } from './Cell';
 import { cx } from './classNames';
+import { leadingCount } from './ColGroup';
 
 /** Attributes for a body `<tr>`, including `data-*` attributes such as `data-testid`. */
 export type RowAttributes = HTMLAttributes<HTMLTableRowElement> & {
@@ -56,38 +57,123 @@ function SelectCell({ id, selected, onToggle, label }: SelectCellProps) {
   );
 }
 
-type RowProps<R> = RowCallbacks<R> & {
-  entry: RowEntry<R>;
-  columns: readonly Column<R>[];
-  /** Index in the whole list, 0-based: drives the odd/even class and `aria-rowindex`. */
-  position: number;
-  /** Rows above the body counted by `aria-rowindex`: 1 with the header row, 0 without. */
-  headerRows: number;
-  selectable: boolean;
-  selected: boolean;
-  onToggleRow?: (id: RowId) => void;
-  selectRowLabel?: string;
-  /** Stable: where the row registers its `<tr>` and reports its mount. */
-  lifecycle?: RowLifecycle<R>;
+/** What `renderDetail` receives. */
+export type DetailContext<R> = { row: R; rowId: RowId };
+
+/** Detail rows (`renderDetail`): the toggle column and the rows shown expanded. */
+export type RowExpansion<R> = {
+  isExpanded: (id: RowId) => boolean;
+  /** Should be stable: rows are memoized on its identity. */
+  toggleRow: (id: RowId) => void;
+  /** Accessible name of each toggle button. */
+  label: string;
+  /** Should be stable: rows are memoized on its identity. */
+  renderDetail: (ctx: DetailContext<R>) => ReactNode;
+  /** Stable, unique per table: prefix of the detail row element ids. */
+  idPrefix: string;
 };
+
+/** The element id of a row's detail row; the row id is encoded so it never holds a space. */
+export function detailRowId(prefix: string, id: RowId): string {
+  return `${prefix}-detail-${encodeURIComponent(String(id))}`;
+}
+
+type ExpandCellProps = { id: RowId; expanded: boolean; onToggle?: (id: RowId) => void; label?: string; detailId: string };
+
+/**
+ * The detail toggle cell: a real button with `aria-expanded`, pointing at the detail row
+ * (`aria-controls`) while that row exists. It swallows clicks like the selection cell.
+ */
+function ExpandCell({ id, expanded, onToggle, label, detailId }: ExpandCellProps) {
+  return (
+    <td className="btt-cell btt-cell--expand" onClick={(event) => event.stopPropagation()}>
+      {onToggle && (
+        <button
+          type="button"
+          className="btt-expand"
+          aria-label={label}
+          aria-expanded={expanded}
+          aria-controls={expanded ? detailId : undefined}
+          onClick={() => onToggle(id)}
+        >
+          <svg className="btt-expand-icon" viewBox="0 0 8 12" width="8" height="12" aria-hidden="true" focusable="false">
+            <path d="M1 1l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="2" />
+          </svg>
+        </button>
+      )}
+    </td>
+  );
+}
+
+/** Per-row flags and callbacks of the detail rows, flat so the row memo compares each one. */
+type RowDetailProps<R> = {
+  expanded: boolean;
+  onToggleExpand?: (id: RowId) => void;
+  expandLabel?: string;
+  renderDetail?: (ctx: DetailContext<R>) => ReactNode;
+  detailIdPrefix?: string;
+};
+
+type RowProps<R> = RowCallbacks<R> &
+  RowDetailProps<R> & {
+    entry: RowEntry<R>;
+    columns: readonly Column<R>[];
+    /** Index in the whole list, 0-based: drives the odd/even class and `aria-rowindex`. */
+    position: number;
+    /** Rows above the body counted by `aria-rowindex`: 1 with the header row, 0 without. */
+    headerRows: number;
+    selectable: boolean;
+    selected: boolean;
+    onToggleRow?: (id: RowId) => void;
+    selectRowLabel?: string;
+    /** Stable: where the row registers its `<tr>` and reports its mount. */
+    lifecycle?: RowLifecycle<R>;
+  };
 
 function rowClasses<R>({ entry, position, rowClassName, rowTone }: RowProps<R>, extra: string | undefined): string {
   const parity = position % 2 === 0 ? 'btt-row--odd' : 'btt-row--even';
   return cx('btt-row', parity, toneClass(rowTone?.(entry.row, entry.index)), rowClassName?.(entry.row, entry.index), extra);
 }
 
-function Row<R>(props: RowProps<R>) {
+/** The data row `tr.btt-row`: toggle cell, selection cell, then one cell per column. */
+function DataRow<R>(props: RowProps<R> & { detailId: string }) {
   const { entry, columns, position, headerRows, selectable, ...select } = props;
   const rowRef = useRef<HTMLTableRowElement>(null);
   useRowEffects(entry, rowRef, props.lifecycle);
   const attributes = props.rowProps?.(entry.row, entry.index) ?? {};
   return (
     <tr {...attributes} ref={rowRef} className={rowClasses(props, attributes.className)} aria-rowindex={position + headerRows + 1}>
+      {props.renderDetail && (
+        <ExpandCell id={entry.id} expanded={props.expanded} onToggle={props.onToggleExpand} label={props.expandLabel} detailId={props.detailId} />
+      )}
       {selectable && <SelectCell id={entry.id} selected={select.selected} onToggle={select.onToggleRow} label={select.selectRowLabel} />}
       {columns.map((column) => (
         <Cell key={column.key} column={column} entry={entry} />
       ))}
     </tr>
+  );
+}
+
+/**
+ * A data row, followed by its `tr.btt-detail-row` while expanded: one cell spanning every
+ * column (toggle and selection columns included). Not a `btt-row`, so it is never counted,
+ * striped or selected as data.
+ */
+function Row<R>(props: RowProps<R>) {
+  const { entry, renderDetail } = props;
+  const detailId = detailRowId(props.detailIdPrefix ?? '', entry.id);
+  const colSpan = props.columns.length + leadingCount({ selectable: props.selectable, expandable: true });
+  return (
+    <>
+      <DataRow {...props} detailId={detailId} />
+      {renderDetail && props.expanded && (
+        <tr className="btt-detail-row" id={detailId}>
+          <td className="btt-detail-cell" colSpan={colSpan}>
+            {renderDetail({ row: entry.row, rowId: entry.id })}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -113,7 +199,16 @@ export type TableBodyProps<R> = RowCallbacks<R> & {
   skeletonRows?: number;
   /** Stable: where the rows register their `<tr>` and report their mounts. */
   lifecycle?: RowLifecycle<R>;
+  /** Detail rows: a leading toggle column and, under each expanded row, its detail row. */
+  expansion?: RowExpansion<R>;
 };
+
+/** The detail props of one row, each one compared by the row memo. */
+function detailProps<R>(expansion: RowExpansion<R> | undefined, id: RowId): RowDetailProps<R> {
+  if (!expansion) return { expanded: false };
+  const { isExpanded, toggleRow, label, renderDetail, idPrefix } = expansion;
+  return { expanded: isExpanded(id), onToggleExpand: toggleRow, expandLabel: label, renderDetail, detailIdPrefix: idPrefix };
+}
 
 /**
  * Placeholder rows while the first rows load: same cells as a data row, so the layout does
@@ -163,13 +258,13 @@ function Spacer({ height, colSpan }: { height: number; colSpan: number }) {
 
 /**
  * The `<tbody>`: one memoized row per mounted entry, keyed by row id, between the spacers
- * of `range`, or the empty message. Driven by a list of
+ * of `range`, or the empty message. An expanded row brings its detail row right after it. Driven by a list of
  * `RowEntry`, whatever the data source. While loading with no rows it draws
  * `skeletonRows` placeholder rows instead of the empty message.
  */
 export function TableBody<R>(props: TableBodyProps<R>) {
-  const { entries, columns, selectable, loading, emptyMessage, range, selection, headerRows = 1, className, skeletonRows = 0, ...callbacks } = props;
-  const colSpan = columns.length + (selectable ? 1 : 0);
+  const { entries, columns, selectable, loading, emptyMessage, range, selection, headerRows = 1, className, skeletonRows = 0, expansion, ...callbacks } = props;
+  const colSpan = columns.length + leadingCount({ selectable, expandable: expansion !== undefined });
   if (entries.length === 0) {
     return <EmptyBody loading={loading} colSpan={colSpan} skeletonRows={skeletonRows} emptyMessage={emptyMessage} className={className} />;
   }
@@ -188,6 +283,7 @@ export function TableBody<R>(props: TableBodyProps<R>) {
           selected={selection?.isSelected(entry.id) ?? false}
           onToggleRow={selection?.toggleRow}
           selectRowLabel={selection?.label}
+          {...detailProps(expansion, entry.id)}
           {...callbacks}
         />
       ))}

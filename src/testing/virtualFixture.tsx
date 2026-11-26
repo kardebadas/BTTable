@@ -19,8 +19,11 @@ export const ROWS_1000 = makeRows(1000);
 export const SERVER_COLUMNS: Column<ServerRow>[] = [{ key: 'name', header: 'Name' }];
 export const serverRows = (first: number, count: number): ServerRow[] => makeRows(count).map((row) => ({ ...row, id: row.id + first, state: 'ny' }));
 
-/** Fake geometry: row heights by id (unknown → 0, i.e. unmeasurable), the viewport height, scroll positions. */
-export const geometry = { heights: new Map<number, number>(), viewport: 200, scrollTops: new WeakMap<Element, number>() };
+/**
+ * Fake geometry: row heights by id (unknown → 0, i.e. unmeasurable), the height of every
+ * detail row (`tr.btt-detail-row`), the viewport height, scroll positions.
+ */
+export const geometry = { heights: new Map<number, number>(), detailHeight: 0, viewport: 200, scrollTops: new WeakMap<Element, number>() };
 /** Animation frame callbacks queued by the table, run by `scrollTo`. */
 export const frames: FrameRequestCallback[] = [];
 
@@ -47,6 +50,7 @@ function mockGeometry() {
     const id = (this as HTMLElement).dataset?.rowId;
     let height = id === undefined ? 0 : (geometry.heights.get(Number(id)) ?? 0);
     if (this.classList.contains('btt-scroll')) height = geometry.viewport;
+    if (this.classList.contains('btt-detail-row')) height = geometry.detailHeight;
     return { height, width: 100, top: 0, left: 0, bottom: height, right: 100, x: 0, y: 0, toJSON: () => ({}) };
   });
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
@@ -64,6 +68,7 @@ function mockGeometry() {
 export function installFakeGeometry(): void {
   beforeEach(() => {
     geometry.heights.clear();
+    geometry.detailHeight = 0;
     geometry.viewport = 200;
     frames.length = 0;
     MockResizeObserver.instances = [];

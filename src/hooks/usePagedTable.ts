@@ -4,12 +4,14 @@ import { buildQuery, typedFiltersKey } from '../core/query';
 import type { Column, FilterState, Query, SortState } from '../core/types';
 import type { TableState } from './tableReducer';
 import { buildEntries, type RowEntry, type RowId, type RowSource, sourceSize } from './rowModel';
+import { type Expansion, type ExpansionProps, useExpansion } from './useExpansion';
 import { type Selection, type SelectionChange, useSelection } from './useSelection';
 import { type ApplyAction, DEFAULT_DEBOUNCE_MS, type TableActions, useTableState } from './useTableState';
 import type { ViewStateProps } from './viewState';
 
 /** The table props shared by server and manual mode: the server pages, sorts and filters the rows. */
-export type PagedTableOptions<R> = ViewStateProps & {
+export type PagedTableOptions<R> = ViewStateProps &
+  ExpansionProps<R> & {
   /** Should be stable (memoized). */
   columns: readonly Column<R>[];
   /** Should be stable (memoized): a new function re-derives every row. */
@@ -55,6 +57,10 @@ export type PagedTable<R> = TableActions & {
   /** Sends the current query again. */
   retry: () => void;
   selection: Selection<R>;
+  /** Expanded detail rows; never pruned (rows on other pages are not loaded). */
+  expansion: Expansion;
+  /** The query of the view state (what `fetchAllRows` is called with, without paging). */
+  query: Query;
 };
 
 /** An empty page. */
@@ -167,6 +173,7 @@ export function usePageModel<R>(options: PagedTableOptions<R>, paged: PagedQuery
   const scopeIds = useMemo(() => pageRows.map((entry) => entry.id), [pageRows]);
   const { selectedIds, defaultSelectedIds, onSelectionChange } = options;
   const selection = useSelection({ scopeIds, selectedIds, defaultSelectedIds, onSelectionChange, entries: pageRows, enabled: Boolean(options.selectable) });
+  const expansion = useExpansion(options);
   return {
     ...actions,
     searchInput: state.searchInput,
@@ -180,5 +187,7 @@ export function usePageModel<R>(options: PagedTableOptions<R>, paged: PagedQuery
     counter: result && view.showCounter ? serverCounter(result, query) : undefined,
     retry,
     selection,
+    expansion,
+    query,
   };
 }

@@ -79,17 +79,25 @@ export type TableHeadProps<R> = {
   selectAll?: SelectAllState;
   /** Extra class on the `<thead>`. */
   className?: string;
+  /** Accessible name of the leading detail toggle column; without it there is no such column. */
+  expandLabel?: string;
 };
 
 /**
  * The sticky `<thead>`: one `<th aria-sort>` per column holding a sort `<button>`
  * (click or Enter cycles asc → desc → none), or the bare header when `sortable` is false.
- * When `selectable`, the first header cell holds the select-all checkbox.
+ * When `selectable`, a header cell before the columns holds the select-all checkbox; with
+ * `expandLabel`, the first one names the detail toggle column.
  */
-export function TableHead<R>({ columns, sort, onSort, selectable, selectAll, className }: TableHeadProps<R>) {
+export function TableHead<R>({ columns, sort, onSort, selectable, selectAll, className, expandLabel }: TableHeadProps<R>) {
   return (
     <thead className={cx('btt-thead', className)} style={STICKY}>
       <tr aria-rowindex={1}>
+        {expandLabel !== undefined && (
+          <th scope="col" className="btt-th btt-th--expand">
+            <span className="btt-sr-only">{expandLabel}</span>
+          </th>
+        )}
         {selectable && (
           <th scope="col" className="btt-th btt-th--select">
             {selectAll && <SelectAllBox {...selectAll} />}

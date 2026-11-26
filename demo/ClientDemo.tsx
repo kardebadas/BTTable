@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { BTTable, type ExportData, type RowId } from '../src';
-import { COLUMNS, generateRows } from './data';
+import { COLUMNS, type DemoRow, generateRows } from './data';
 import { HeaderWidths } from './HeaderWidths';
 
 const ROWS = generateRows(5_000, 42);
@@ -17,7 +17,19 @@ function downloadJson(format: string, data: ExportData): void {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-/** Client mode: 5,000 in-memory rows of varied height, every filter type, selection and exports. */
+/** The detail row of a demo record: its full notes and tags. */
+function renderDetail({ row }: { row: DemoRow }) {
+  return (
+    <dl className="demo-detail">
+      <dt>Notes</dt>
+      <dd>{row.notes}</dd>
+      <dt>Tags</dt>
+      <dd>{row.tags.join(', ') || '—'}</dd>
+    </dl>
+  );
+}
+
+/** Client mode: 5,000 in-memory rows of varied height, every filter type, selection, detail rows and exports. */
 export function ClientDemo({ themeClass }: { themeClass?: string }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [paginate, setPaginate] = useState(false);
@@ -39,6 +51,7 @@ export function ClientDemo({ themeClass }: { themeClass?: string }) {
           selectable
           selectedIds={selected}
           onSelectionChange={setSelected}
+          renderDetail={renderDetail}
           exportCsv
           exportFileName="bttable-demo.csv"
           exportFormats={EXPORT_FORMATS}
