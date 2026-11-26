@@ -24,6 +24,8 @@ export type TableActions = {
   toggleSort: (key: string) => void;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
+  /** What a new `resetKey` does: search and filters back to their defaults, page 1. */
+  resetView: () => void;
 };
 
 /** Applies one action to the state on screen, updates the own state and reports the changes. */
@@ -42,6 +44,11 @@ function pageSizeOf<R>(options: TableStateOptions<R>): number {
 /** The filters `resetKey` goes back to: `defaultFilters` merged over the column defaults. */
 function resetFilters<R>(options: TableStateOptions<R>): FilterState {
   return { ...columnDefaults(options.columns), ...options.defaultFilters };
+}
+
+/** The action of a reset: search and filters back to their defaults. */
+function resetAction<R>(options: TableStateOptions<R>): TableAction {
+  return { type: 'reset', filters: resetFilters(options), search: options.defaultSearchValue ?? '' };
 }
 
 function initState<R>(options: TableStateOptions<R>): TableState {
@@ -103,7 +110,7 @@ function syncedState<R>(from: TableState, changes: Changes, options: TableStateO
   let to = from;
   if (changes.search) to = { ...to, searchInput: to.search };
   if (changes.search || changes.filters || changes.pageSize) to = { ...to, page: 1 };
-  if (changes.reset) to = tableReducer(to, { type: 'reset', filters: resetFilters(options), search: options.defaultSearchValue ?? '' });
+  if (changes.reset) to = tableReducer(to, resetAction(options));
   return to;
 }
 
@@ -171,7 +178,7 @@ function useApply(dispatch: Dispatch<Transition>, latestRef: Ref<TableState>, ca
   );
 }
 
-function useActions(apply: ApplyAction): TableActions {
+function useActions<R>(apply: ApplyAction, optionsRef: Ref<TableStateOptions<R>>): TableActions {
   return useMemo(
     () => ({
       setSearch: (text: string) => apply({ type: 'type', text }),
@@ -184,8 +191,9 @@ function useActions(apply: ApplyAction): TableActions {
       toggleSort: (key: string) => apply({ type: 'sort', key }),
       setPage: (page: number) => apply({ type: 'page', page }),
       setPageSize: (pageSize: number) => apply({ type: 'pageSize', pageSize }),
+      resetView: () => apply(resetAction(optionsRef.current)),
     }),
-    [apply],
+    [apply, optionsRef],
   );
 }
 
@@ -203,9 +211,9 @@ export function useTableState<R>(options: TableStateOptions<R>) {
   const report = usePropSync(own, dispatch, options);
   const state = controlledState(own, options);
   const latestRef = useLatest(state);
-  const callbacksRef = useLatest<ViewStateProps>(options);
+  const callbacksRef = useLatest(options);
   useReport(report, callbacksRef);
   const apply = useApply(dispatch, latestRef, callbacksRef);
   useSearchDebounce(state, own.search, apply, options.searchDebounceMs ?? DEFAULT_DEBOUNCE_MS);
-  return { state, apply, actions: useActions(apply) };
+  return { state, apply, actions: useActions(apply, callbacksRef) };
 }

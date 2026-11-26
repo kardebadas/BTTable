@@ -5,6 +5,7 @@ import type { Column, FetchRows, Query } from './core/types';
 import type { VirtualizeMode } from './core/virtual';
 import type { RowId, RowSource } from './hooks/rowModel';
 import type { ClientTableState } from './hooks/useClientTable';
+import type { RowLifecycleProps } from './hooks/useRowLifecycle';
 import type { SelectionChange } from './hooks/useSelection';
 import type { ViewStateProps } from './hooks/viewState';
 import type { BTTableLabels } from './labels';
@@ -14,6 +15,7 @@ export type SelectionBarContext<R> = { selectedIds: RowId[]; selectedRows: R[]; 
 
 /** Props of `BTTable` shared by every data mode. */
 export type BTTableCommonProps<R> = RowCallbacks<R> &
+  RowLifecycleProps<R> &
   ControlProps &
   ViewStateProps & {
   /** Should be stable (memoized): a new array re-derives and re-renders every row on every parent render. */

@@ -175,6 +175,36 @@
   background-color: var(--btt-row-hover);
 }
 
+/* Row tones (rowTone): over striping and plain hover, under the selection tint; text keeps the tone colour. */
+:where(.btt-row--tone-danger) {
+  --btt-tone-bg: var(--btt-tone-danger-bg);
+  --btt-tone-fg: var(--btt-tone-danger-fg);
+}
+
+:where(.btt-row--tone-warning) {
+  --btt-tone-bg: var(--btt-tone-warning-bg);
+  --btt-tone-fg: var(--btt-tone-warning-fg);
+}
+
+:where(.btt-row--tone-success) {
+  --btt-tone-bg: var(--btt-tone-success-bg);
+  --btt-tone-fg: var(--btt-tone-success-fg);
+}
+
+:where(.btt-row--tone-info) {
+  --btt-tone-bg: var(--btt-tone-info-bg);
+  --btt-tone-fg: var(--btt-tone-info-fg);
+}
+
+:where(.btt-row--tone-danger, .btt-row--tone-warning, .btt-row--tone-success, .btt-row--tone-info) {
+  color: var(--btt-tone-fg);
+  background-color: var(--btt-tone-bg);
+}
+
+:where(.btt-row--tone-danger, .btt-row--tone-warning, .btt-row--tone-success, .btt-row--tone-info):where(:hover) {
+  background-color: color-mix(in srgb, var(--btt-tone-fg) 10%, var(--btt-tone-bg));
+}
+
 :where(.btt-row:has(> .btt-cell--select .btt-select:checked)) {
   background-color: color-mix(in srgb, var(--btt-accent) 16%, var(--btt-bg));
 }

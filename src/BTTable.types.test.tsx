@@ -1,6 +1,8 @@
+import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
 import { BTTable } from './BTTable';
 import type { Column, FetchRows } from './core/types';
+import type { BTTableHandle } from './hooks/useTableHandle';
 
 type Row = { id: number; name: string };
 const COLUMNS: Column<Row>[] = [{ key: 'name', header: 'Name' }];
@@ -42,5 +44,23 @@ describe('BTTableProps', () => {
     // @ts-expect-error -- server mode takes no mode
     const serverManual = <BTTable columns={COLUMNS} fetchRows={fetchRows} mode="manual" onQueryChange={onQueryChange} />;
     expect([manual, manualMap, noCallback, noRows, withFetch, clientTotals, serverManual]).toHaveLength(7);
+  });
+
+  it('takes a BTTableHandle ref and still infers the row type', () => {
+    const ref = createRef<BTTableHandle>();
+    const withRef = <BTTable ref={ref} columns={COLUMNS} rows={ROWS} onRowMount={(row) => row.name} />;
+    // @ts-expect-error -- the row type is still checked with a ref
+    const wrongRows = <BTTable ref={ref} columns={COLUMNS} rows={[{ id: 1 }]} />;
+    // @ts-expect-error -- the ref is a BTTableHandle
+    const wrongRef = <BTTable ref={createRef<HTMLDivElement>()} columns={COLUMNS} rows={ROWS} />;
+    expect([withRef, wrongRows, wrongRef]).toHaveLength(3);
+  });
+
+  it('takes cell components whose extra props are optional', () => {
+    const Tag = ({ value, tone }: { value: unknown; tone?: string }) => <span data-tone={tone}>{String(value)}</span>;
+    const columns: Column<Row>[] = [{ key: 'name', header: 'Name', cell: Tag, cellProps: { tone: 'info' } }];
+    // @ts-expect-error -- rowTone takes the known tones only
+    const tone = <BTTable columns={columns} rows={ROWS} rowTone={() => 'loud'} />;
+    expect([columns, tone]).toHaveLength(2);
   });
 });

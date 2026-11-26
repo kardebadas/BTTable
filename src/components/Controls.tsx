@@ -52,6 +52,8 @@ export type TableControls<R = unknown> = {
   setFilter: (key: string, value: FilterValue) => void;
   /** Empties the search and every filter at once, back to page 1. */
   clearAll: () => void;
+  /** Search and filters back to their defaults, page 1 (what a new `resetKey` does). */
+  resetView: () => void;
   page: number;
   pageCount: number;
   pageSize: number;

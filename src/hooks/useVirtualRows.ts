@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { anchoredScrollTop, rowOffsets, type VirtualWindow, virtualWindow } from '../core/virtual';
 import type { RowEntry, RowId } from './rowModel';
@@ -214,13 +214,39 @@ function useOffsets<R>(input: { enabled: boolean; entries: readonly RowEntry<R>[
 }
 
 /**
+ * Scrolls to `top` and always renders again, even when the scroll state already holds
+ * `top` (a reset to 0 in the same commit makes the rendered window stale without changing it).
+ */
+function useJumpTo(scrollRef: RefObject<HTMLElement | null>, setScrollTop: (top: number) => void): (top: number) => void {
+  const [, rerender] = useReducer((count: number) => count + 1, 0);
+  return useCallback(
+    (top: number) => {
+      if (scrollRef.current) scrollRef.current.scrollTop = top;
+      setScrollTop(top);
+      rerender();
+    },
+    [scrollRef, setScrollTop],
+  );
+}
+
+/** What `useVirtualRows` returns. */
+export type VirtualRows = {
+  /** The entries to mount and the spacer heights around them. */
+  range: VirtualWindow;
+  /** Top offset of each entry (and the total height last), from measured or estimated heights. */
+  offsets: number[];
+  /** Scrolls to `top` px and renders the window there in the next commit (always a new commit). */
+  jumpTo: (top: number) => void;
+};
+
+/**
  * Row virtualization for the scroll container in `scrollRef`: which entries to mount and
- * the spacer heights around them. Row heights are measured (one `ResizeObserver`, cached by
+ * the spacer heights around them, plus their offsets. Row heights are measured (one `ResizeObserver`, cached by
  * row id) and stand in for `estimatedRowHeight` once known; the first visible row stays put
  * when heights above it change; the scroll position resets to the top when `viewKey`
  * changes. When `enabled` is false every entry is mounted, with no spacers.
  */
-export function useVirtualRows<R>({ entries, viewKey, enabled, estimatedRowHeight, scrollRef }: UseVirtualRowsInput<R>): VirtualWindow {
+export function useVirtualRows<R>({ entries, viewKey, enabled, estimatedRowHeight, scrollRef }: UseVirtualRowsInput<R>): VirtualRows {
   const [cache] = useState<Heights>(() => new Map());
   const [layout, setLayout] = useState<Layout<R>>({ entries: [], estimate: estimatedRowHeight, offsets: NO_OFFSETS });
   const [scrollTop, setScrollTop] = useState(0);
@@ -240,5 +266,6 @@ export function useVirtualRows<R>({ entries, viewKey, enabled, estimatedRowHeigh
   const observer = useResizeObserver(enabled, shared);
   const commit = { enabled, entries, estimate: estimatedRowHeight, offsets, start: window.start, observer };
   useMeasureAfterCommit(commit, shared);
-  return window;
+  const jumpTo = useJumpTo(scrollRef, setScrollTop);
+  return { range: window, offsets, jumpTo };
 }

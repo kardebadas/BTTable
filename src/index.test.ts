@@ -12,7 +12,13 @@ describe('package entry', () => {
     expect(typeof api.parseDate).toBe('function');
     expect(typeof api.compareValues).toBe('function');
     expect(typeof api.formatValue).toBe('function');
-    expect(typeof api.BTTable).toBe('function');
+  });
+
+  it('exports BTTable as a ref-forwarding component and the handle types', () => {
+    expect((api.BTTable as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.forward_ref'));
+    const align: api.RowAlign = 'center';
+    const tone: api.RowTone = 'info';
+    expect([align, tone]).toEqual(['center', 'info']);
   });
 
   it('exports the default labels and the VirtualizeMode type', () => {

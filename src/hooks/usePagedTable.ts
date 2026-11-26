@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { type CounterData, getCounter, pageCount } from '../core/pagination';
 import { buildQuery, typedFiltersKey } from '../core/query';
 import type { Column, FilterState, Query, SortState } from '../core/types';
+import type { TableState } from './tableReducer';
 import { buildEntries, type RowEntry, type RowId, type RowSource, sourceSize } from './rowModel';
 import { type Selection, type SelectionChange, useSelection } from './useSelection';
 import { type ApplyAction, DEFAULT_DEBOUNCE_MS, type TableActions, useTableState } from './useTableState';
@@ -124,11 +125,11 @@ function useLandedClears(clears: number, query: Query, queryKey: string): number
   return next.landed;
 }
 
-/** The request generation: bumped by `refreshKey`, `resetKey`, Retry and a landed "Clear all", each sent at once. */
-function useGeneration<R>(options: PagedTableOptions<R>, clears: number, query: Query, queryKey: string) {
+/** The request generation: bumped by `refreshKey`, a reset (`resetKey`, `resetView`), Retry and a landed "Clear all", each sent at once. */
+function useGeneration<R>(options: PagedTableOptions<R>, state: TableState, query: Query, queryKey: string) {
   const [retries, setRetries] = useState(0);
   const retry = useCallback(() => setRetries((count) => count + 1), []);
-  const generation = useChangeCount(options.refreshKey) + useChangeCount(options.resetKey) + useLandedClears(clears, query, queryKey) + retries;
+  const generation = useChangeCount(options.refreshKey) + state.resets + useLandedClears(state.clears, query, queryKey) + retries;
   return { generation, retry };
 }
 
@@ -141,7 +142,7 @@ export function usePagedQuery<R>(options: PagedTableOptions<R>) {
   const { state, apply, actions } = useTableState(options);
   const query = buildQuery(state, options.columns);
   const queryKey = JSON.stringify(query);
-  const { generation, retry } = useGeneration(options, state.clears, query, queryKey);
+  const { generation, retry } = useGeneration(options, state, query, queryKey);
   const keys = { queryKey, viewKey: `${state.resets}:${queryKey}`, typedKey: typedFiltersKey(query), generation };
   const delay = options.searchDebounceMs ?? DEFAULT_DEBOUNCE_MS;
   return { state, apply, actions, query, keys, delay, retry };

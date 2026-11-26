@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, type ReactElement, type Ref, type RefAttributes, useRef } from 'react';
 import { cx } from './components/classNames';
 import { ColGroup, tableMinWidth, toCssSize } from './components/ColGroup';
 import { FooterControls, type TableControls, TopControls } from './components/Controls';
@@ -10,17 +10,19 @@ import { getCounter } from './core/pagination';
 import type { FetchRows, Query, SortState } from './core/types';
 import { ownRowId } from './core/values';
 import { shouldVirtualize } from './core/virtual';
-import type { RowEntry, RowSource } from './hooks/rowModel';
+import type { RowEntry, RowId, RowSource } from './hooks/rowModel';
 import { type ClientTable as ClientTableModel, useClientTable } from './hooks/useClientTable';
 import { useManualTable } from './hooks/useManualTable';
 import type { PagedTable } from './hooks/usePagedTable';
 import { useServerTable } from './hooks/useServerTable';
-import { isDevelopment, useRowWarnings } from './hooks/useRowWarnings';
+import { type RowLifecycle, useRowLifecycle } from './hooks/useRowLifecycle';
+import { useRowWarnings, useWarnOnce } from './hooks/useRowWarnings';
+import { type BTTableHandle, useTableHandle } from './hooks/useTableHandle';
 import { useVirtualRows } from './hooks/useVirtualRows';
 import type { BTTableAnyProps, BTTableProps } from './BTTableProps';
 import { type BTTableLabels, DEFAULT_LABELS } from './labels';
 
-type ContentProps<R> = BTTableAnyProps<R> & { labels: BTTableLabels };
+type ContentProps<R> = BTTableAnyProps<R> & { labels: BTTableLabels; handleRef?: Ref<BTTableHandle> };
 
 type ViewProps<R> = ContentProps<R> & {
   entries: readonly RowEntry<R>[];
@@ -30,6 +32,8 @@ type ViewProps<R> = ContentProps<R> & {
   onSort: (key: string) => void;
   /** Toolbar, filters, footer and selection state; without it only the table renders. */
   controls?: TableControls<R>;
+  /** Client mode: the page showing a row, null when it is filtered out. */
+  findPage?: (id: RowId) => number | null;
 };
 
 /** The status strip always keeps one line of height, so loading never shifts the table. */
@@ -65,8 +69,31 @@ function useTableVirtualization<R>(props: ViewProps<R>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const enabled = shouldVirtualize({ virtualize, maxHeight, rowCount: entries.length, threshold: virtualizeThreshold });
   const estimatedRowHeight = rowEstimate(props.estimatedRowHeight);
-  const range = useVirtualRows({ entries, viewKey, enabled, estimatedRowHeight, scrollRef });
-  return { scrollRef, enabled, range, maxHeight };
+  const virtual = useVirtualRows({ entries, viewKey, enabled, estimatedRowHeight, scrollRef });
+  return { scrollRef, enabled, virtual, maxHeight };
+}
+
+type ScrollParts<R> = ReturnType<typeof useTableVirtualization<R>> & { lifecycle: RowLifecycle<R> };
+
+/** The `ref` handle of the table, over the scroll area, the rows on screen and the controls. */
+function useScrollHandle<R>(props: ViewProps<R>, { scrollRef, enabled, virtual, maxHeight, lifecycle }: ScrollParts<R>): void {
+  const { controls } = props;
+  const noop = () => {};
+  useTableHandle(props.handleRef, {
+    scrollRef,
+    pageScroll: maxHeight === 'none',
+    entries: props.entries,
+    viewKey: props.viewKey,
+    columns: props.columns,
+    selectable: Boolean(props.selectable),
+    elements: lifecycle.elements,
+    virtual: { enabled, offsets: virtual.offsets, jumpTo: virtual.jumpTo },
+    page: controls?.page ?? 1,
+    setPage: controls?.setPage ?? noop,
+    findPage: props.findPage,
+    clearSelection: controls?.selection.clear ?? noop,
+    resetView: controls?.resetView ?? noop,
+  });
 }
 
 /** The select-all box and the row checkboxes, when the table is selectable and has selection state. */
@@ -103,7 +130,10 @@ function bodyFallback<R>({ columns, selectable, labels, tbodyClassName }: ViewPr
 /** The scroll container and the table: fixed layout, sticky header (unless hidden), rows virtualized when on. */
 function TableScroll<R>(props: ViewProps<R>) {
   const { columns, entries, selectable = false, loading = false, emptyMessage = 'No records found', showTableHeader = true } = props;
-  const { scrollRef, enabled, range, maxHeight } = useTableVirtualization(props);
+  const scroll = useTableVirtualization(props);
+  const { scrollRef, enabled, maxHeight } = scroll;
+  const lifecycle = useRowLifecycle(props);
+  useScrollHandle(props, { ...scroll, lifecycle });
   const { selectAll, rowSelection } = selectionControls(props);
   const headerRows = showTableHeader ? 1 : 0;
   // Collapsed borders: no border-spacing between rows, so rows sit exactly at their measured offsets.
@@ -113,7 +143,7 @@ function TableScroll<R>(props: ViewProps<R>) {
   const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(maxHeight), overflowAnchor: enabled ? 'none' : undefined } as const;
   const head = { columns, sort: props.sort, onSort: props.onSort, selectable, selectAll, className: props.theadClassName };
   const skeletonRows = skeletonCount(props.controls?.pageSize);
-  const body = { entries, columns, selectable, loading, emptyMessage, range, selection: rowSelection, headerRows, skeletonRows };
+  const body = { entries, columns, selectable, loading, emptyMessage, range: scroll.virtual.range, selection: rowSelection, headerRows, skeletonRows, lifecycle };
   return (
     <div className="btt-scroll" style={scrollStyle} ref={scrollRef}>
       <table className={cx('btt-table', props.tableClassName)} style={tableStyle} aria-busy={loading} aria-rowcount={entries.length + headerRows}>
@@ -121,7 +151,7 @@ function TableScroll<R>(props: ViewProps<R>) {
         <ColGroup columns={columns} selectable={selectable} />
         {showTableHeader && <TableHead {...head} />}
         <ErrorBoundary fallback={bodyFallback(props)} onError={props.onError} resetKey={entries}>
-          <TableBody {...body} className={props.tbodyClassName} rowClassName={props.rowClassName} rowProps={props.rowProps} />
+          <TableBody {...body} className={props.tbodyClassName} rowClassName={props.rowClassName} rowProps={props.rowProps} rowTone={props.rowTone} />
         </ErrorBoundary>
       </table>
     </div>
@@ -164,11 +194,19 @@ function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): 
   return { ...table, counter, exportData, exportRowCount: table.filteredRows.length };
 }
 
+/** The page of a filtered row in client mode (1 without pagination); null when filtered out. */
+function clientPageOf<R>(table: ClientTableModel<R>, paginated: boolean, id: RowId): number | null {
+  const index = table.filteredRows.findIndex((entry) => entry.id === id);
+  if (index < 0) return null;
+  return paginated ? Math.floor(index / table.pageSize) + 1 : 1;
+}
+
 function ClientTable<R>(props: ContentProps<R> & { rows: RowSource<R> }) {
   const table = useClientTable(props);
-  useRowWarnings(props.rows, table.entries);
+  useRowWarnings(props.rows, table.entries, props.getRowId);
   const controls = clientControls(table, props);
-  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort };
+  const findPage = (id: RowId) => clientPageOf(table, props.pagination !== false, id);
+  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort, findPage };
   return <TableView {...props} {...view} controls={controls} />;
 }
 
@@ -193,16 +231,6 @@ function serverControls<R>(table: PagedTable<R>, props: ContentProps<R>): TableC
   return { ...table, exportData, exportRowCount: table.pageRows.length, counterHelp: true };
 }
 
-/** Logs `message` once per mount, in development, the first time `condition` holds. */
-function useWarnOnce(condition: boolean, message: string): void {
-  const warned = useRef(false);
-  useEffect(() => {
-    if (!condition || warned.current || !isDevelopment()) return;
-    warned.current = true;
-    console.warn(message);
-  }, [condition, message]);
-}
-
 /** Development warnings of server and manual mode: ignored `pagination={false}` and selectable rows without ids. */
 function useServerWarnings<R>(props: ContentProps<R>, pageRows: readonly RowEntry<R>[]): void {
   const [mode, source] = props.mode === 'manual' ? ['manual', 'the parent'] : ['server', 'fetchRows'];
@@ -219,7 +247,7 @@ function useServerWarnings<R>(props: ContentProps<R>, pageRows: readonly RowEntr
 function ServerTable<R>(props: ContentProps<R> & { fetchRows: FetchRows<R> }) {
   const table = useServerTable(props);
   useServerWarnings(props, table.pageRows);
-  useRowWarnings(table.responseRows, table.pageRows);
+  useRowWarnings(table.responseRows, table.pageRows, props.getRowId);
   const loading = Boolean(props.loading) || table.loading;
   const emptyMessage = table.error ? <LoadError labels={props.labels} onRetry={table.retry} /> : props.emptyMessage;
   const view = { entries: table.pageRows, viewKey: table.viewKey, loading, emptyMessage, sort: table.sort, onSort: table.toggleSort, pagination: true };
@@ -232,7 +260,7 @@ type ManualContentProps<R> = ContentProps<R> & { rows: RowSource<R>; onQueryChan
 function ManualTable<R>(props: ManualContentProps<R>) {
   const table = useManualTable(props);
   useServerWarnings(props, table.pageRows);
-  useRowWarnings(props.rows, table.pageRows);
+  useRowWarnings(props.rows, table.pageRows, props.getRowId);
   const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort, pagination: true };
   return <TableView {...props} {...view} controls={serverControls(table, props)} />;
 }
@@ -252,7 +280,7 @@ function TableContent<R>(props: ContentProps<R>) {
  * passing both or neither of `rows` / `fetchRows`, or `mode="manual"` without `rows` and
  * `onQueryChange`, is such an error.
  */
-export function BTTable<R>(props: BTTableProps<R>) {
+function BTTableWithRef<R>(props: BTTableProps<R>, ref: Ref<BTTableHandle>) {
   const labels = { ...DEFAULT_LABELS, ...props.labels };
   const fallback = (
     <div className="btt-error" role="alert">
@@ -262,8 +290,15 @@ export function BTTable<R>(props: BTTableProps<R>) {
   return (
     <div className={cx('btt', props.className)}>
       <ErrorBoundary fallback={fallback} onError={props.onError} resetKey={props.rows ?? props.fetchRows}>
-        <TableContent {...props} labels={labels} />
+        <TableContent {...props} labels={labels} handleRef={ref} />
       </ErrorBoundary>
     </div>
   );
 }
+
+/**
+ * The table (see `BTTableWithRef`). `ref` takes a `BTTableHandle`
+ * (`useRef<BTTableHandle>(null)`); the cast keeps the row type `R` generic, which
+ * `forwardRef` alone would fix to `unknown`.
+ */
+export const BTTable = forwardRef(BTTableWithRef) as <R>(props: BTTableProps<R> & RefAttributes<BTTableHandle>) => ReactElement;

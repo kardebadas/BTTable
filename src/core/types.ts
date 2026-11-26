@@ -1,4 +1,4 @@
-import type { FocusEvent, FormEvent, MouseEvent, ReactNode } from 'react';
+import type { ComponentType, FocusEvent, FormEvent, MouseEvent, ReactNode } from 'react';
 
 /** One choice of a `select` or `multiselect` filter. */
 export type Option = { value: string; label: ReactNode };
@@ -57,6 +57,14 @@ export type Column<R> = {
   align?: 'left' | 'center' | 'right';
   value?: (row: R) => unknown;
   render?: (ctx: CellContext<R>) => ReactNode;
+  /**
+   * Cell content as a real component (hooks, `memo` and `forwardRef` work), rendered with
+   * `cellProps` and the `CellContext` as its props. Wins over `render`. Keep it stable:
+   * a new component type remounts every cell.
+   */
+  cell?: ComponentType<CellContext<R>>;
+  /** Extra props of `cell`, or a function of the row; the `CellContext` props win on a clash; `key` and `ref` are dropped. */
+  cellProps?: object | ((row: R) => object);
   sortable?: boolean;
   sortValue?: (row: R) => unknown;
   searchable?: boolean;
@@ -65,6 +73,8 @@ export type Column<R> = {
   filter?: FilterSpec;
   cellClassName?: string | ((row: R) => string | undefined);
   headerClassName?: string;
+  /** Class on the column's `<col>`: a styling hook only, widths still come from `width`. */
+  colClassName?: string;
   /** Click on a body cell of this column. Keep columns stable: rows are memoized on them. */
   onCellClick?: CellHandler<R, MouseEvent<HTMLTableCellElement>>;
   /** Change event bubbling from an input inside a body cell of this column. */

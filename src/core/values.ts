@@ -14,6 +14,23 @@ export function ownRowId(row: unknown): string | number | undefined {
   return undefined;
 }
 
+/**
+ * True when a row has two of `id`, `ID`, `INDEX`, `N_ID` (strings or numbers) whose text
+ * differs, so the id order decides which one is the row's id. `7` and `'7'` agree.
+ */
+export function hasConflictingIds(row: unknown): boolean {
+  if (typeof row !== 'object' || row === null) return false;
+  const record = row as Record<string, unknown>;
+  let first: string | undefined;
+  for (const key of ID_KEYS) {
+    const id = record[key];
+    if (typeof id !== 'string' && typeof id !== 'number') continue;
+    if (first === undefined) first = String(id);
+    else if (String(id) !== first) return true;
+  }
+  return false;
+}
+
 /** The raw value of `column` for `row`: `column.value(row)`, else `row[column.key]`. */
 export function getColumnValue<R>(column: Column<R>, row: R): unknown {
   if (column.value) return column.value(row);

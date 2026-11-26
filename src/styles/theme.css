@@ -25,6 +25,14 @@
   --btt-danger: #c42b1c;
   --btt-muted: #5a6876;
   --btt-radius: 6px;
+  --btt-tone-danger-bg: #fde8e6;
+  --btt-tone-danger-fg: #8c1d12;
+  --btt-tone-warning-bg: #fff3d1;
+  --btt-tone-warning-fg: #6b4500;
+  --btt-tone-success-bg: #e3f5e8;
+  --btt-tone-success-fg: #17592d;
+  --btt-tone-info-bg: #e3f0fc;
+  --btt-tone-info-fg: #0a4a87;
   color-scheme: light;
 }
 
@@ -42,6 +50,14 @@
     --btt-accent: #5ea8f0;
     --btt-danger: #ff7b6e;
     --btt-muted: #9aa8b6;
+    --btt-tone-danger-bg: #3e1b18;
+    --btt-tone-danger-fg: #ffb4a9;
+    --btt-tone-warning-bg: #3a2c0c;
+    --btt-tone-warning-fg: #ffd88a;
+    --btt-tone-success-bg: #15331f;
+    --btt-tone-success-fg: #9be2b0;
+    --btt-tone-info-bg: #13304c;
+    --btt-tone-info-fg: #a9d2fa;
     color-scheme: dark;
   }
 }
@@ -59,6 +75,14 @@
   --btt-accent: #5ea8f0;
   --btt-danger: #ff7b6e;
   --btt-muted: #9aa8b6;
+  --btt-tone-danger-bg: #3e1b18;
+  --btt-tone-danger-fg: #ffb4a9;
+  --btt-tone-warning-bg: #3a2c0c;
+  --btt-tone-warning-fg: #ffd88a;
+  --btt-tone-success-bg: #15331f;
+  --btt-tone-success-fg: #9be2b0;
+  --btt-tone-info-bg: #13304c;
+  --btt-tone-info-fg: #a9d2fa;
   color-scheme: dark;
 }
 

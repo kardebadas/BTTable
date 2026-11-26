@@ -27,6 +27,7 @@ mounted.
 - [Selection](#selection)
 - [Export](#export)
 - [Layout, virtualization and performance](#layout-virtualization-and-performance)
+- [Imperative handle (ref)](#imperative-handle-ref)
 - [Labels (i18n)](#labels-i18n)
 - [Theming](#theming)
 - [Accessibility](#accessibility)
@@ -114,6 +115,8 @@ type Column<R> = {
   align?: 'left' | 'center' | 'right';
   value?: (row: R) => unknown;
   render?: (ctx: CellContext<R>) => ReactNode;
+  cell?: ComponentType<CellContext<R>>;
+  cellProps?: object | ((row: R) => object);
   sortable?: boolean;
   sortValue?: (row: R) => unknown;
   searchable?: boolean;
@@ -122,6 +125,7 @@ type Column<R> = {
   filter?: FilterSpec;
   cellClassName?: string | ((row: R) => string | undefined);
   headerClassName?: string;
+  colClassName?: string;
   onCellClick?: (event: MouseEvent<HTMLTableCellElement>, ctx: CellContext<R>) => void;
   onCellChange?: (event: FormEvent<HTMLTableCellElement>, ctx: CellContext<R>) => void;
   onCellBlur?: (event: FocusEvent<HTMLTableCellElement>, ctx: CellContext<R>) => void;
@@ -139,7 +143,9 @@ type CellContext<R> = { row: R; value: unknown; rowIndex: number; rowId: string 
 | `minWidth` | `60` | Px. Each column adds its numeric `width`, else its `minWidth`, to the table's `min-width`; below that the table scrolls horizontally. |
 | `align` | `'left'` | Header and cell alignment. |
 | `value` | `row[key]` | The raw value used for display, sorting, search, filters and export unless a more specific function is given. |
-| `render` | the formatted value | Cell content. Default formatting: `null`/`undefined`/`NaN` → empty, booleans → `Yes`/`No`, dates → `M/D/YYYY`, arrays comma-joined, React elements as is. `rowIndex` is the row's index in `rows` (a map: its position); `rowId` is its id. |
+| `render` | the formatted value | Cell content. Default formatting: `null`/`undefined`/`NaN` → empty, booleans → `Yes`/`No`, dates → `M/D/YYYY`, arrays comma-joined, React elements as is, and an array holding React elements as a fragment (elements as they are, other items as text; export and search use the text). `rowIndex` is the row's index in `rows` (a map: its position); `rowId` is its id. |
+| `cell` | none | Cell content as a real component, rendered as `<cell {...cellProps} {...ctx} />`: hooks, effects, `memo` and `forwardRef` work. Wins over `render`. Keep it stable (module level): a new component type remounts every cell. Display only: sort, search, filters and export still read `value`. |
+| `cellProps` | none | Extra props for `cell`: an object, or `(row) => object`. The `CellContext` props win on a clash; `key` and `ref` are dropped (they are not props). Give the component's extra props as optional (`CellContext<R> & { tone?: string }`). |
 | `sortable` | `true` | `false` renders a plain header with no sort button. |
 | `sortValue` | `value` | The value the column sorts by. |
 | `searchable` | `true` | `false` leaves the column out of the global search. |
@@ -148,6 +154,7 @@ type CellContext<R> = { row: R; value: unknown; rowIndex: number; rowId: string 
 | `filter` | none | A filter widget for this column; see [Filters](#filters). |
 | `cellClassName` | none | Class for every body cell of the column, or a function of the row. |
 | `headerClassName` | none | Class for the header cell. |
+| `colClassName` | none | Class on the column's `<col>`: a styling hook only (e.g. a background for the whole column). Widths still come from `width`. |
 | `onCellClick` | none | `(event, ctx) => void` on a click in a body cell of the column; `ctx` is the `CellContext` (with `rowId`). |
 | `onCellChange` | none | `(event, ctx) => void` on a change event bubbling from an input inside the cell (`event.target` is the input). |
 | `onCellBlur` | none | `(event, ctx) => void` on a blur bubbling from an element inside the cell. |
@@ -157,7 +164,15 @@ They come from `columns`, so keep the columns stable and rows stay memoized.
 
 `render`, `value`, `sortValue` and the other functions are plain functions called by the
 table, not components: **do not call hooks inside them**. If a cell needs state or effects,
-return a component from `render` (`render: ({ row }) => <StatusCell row={row} />`).
+use `cell`:
+
+```tsx
+function StatusCell({ row, label }: CellContext<Person> & { label?: string }) {
+  const [open, setOpen] = useState(false);
+  return <button onClick={() => setOpen(!open)}>{label}: {row.status}</button>;
+}
+const columns: Column<Person>[] = [{ key: 'status', header: 'Status', cell: StatusCell, cellProps: { label: 'Status' } }];
+```
 
 ## Rows and ids
 
@@ -175,11 +190,36 @@ return a component from `render` (`render: ({ row }) => <StatusCell row={row} />
   page, so it collides across pages. Server rows need real ids (development warning when a
   selectable server table has rows without one and no `getRowId`). Ids must be unique:
   in development the table warns once per `rows` array (or server response) when some rows
-  repeat an earlier row's id.
+  repeat an earlier row's id. It also warns once per table when a row has two of `id`, `ID`,
+  `INDEX`, `N_ID` whose values differ (`7` and `'7'` agree) and no `getRowId` picks one.
 - `rowClassName?: (row, index) => string | undefined` — extra class for a body row.
+- `rowTone?: (row, index) => 'danger' | 'warning' | 'success' | 'info' | undefined` — colours
+  the row (class `btt-row--tone-<tone>`, from the `--btt-tone-*` variables, light and dark,
+  AA contrast). It sits over striping and hover and under the selection tint; a
+  `rowClassName` style of yours still wins. Unknown tones are ignored.
+- `onRowMount?: (row, element, rowId) => void` / `onRowUnmount?: (row, rowId) => void` —
+  called in an effect after a data row mounts, and in its cleanup when it unmounts (with the
+  row as last rendered). A re-render of the row with the same id calls neither. With
+  virtualization they fire as rows enter and leave the mounted window (scrolling mounts and
+  unmounts rows), and a page change unmounts the old page's rows. Every mount is paired
+  with an unmount, StrictMode's double effects included. They need not be stable: rows read
+  the latest functions without re-rendering.
 - `rowProps?: (row, index) => attributes` — any `<tr>` attributes, including `onClick`,
   `data-*` and `className` (merged with the table's classes). `index` is the row's index in
   `rows` (server mode: on the page).
+
+**Not carried over from the legacy table, on purpose:**
+
+- The legacy id order (`INDEX` first) — `id` is the standard field and `INDEX` came first for
+  one internal shape only. The order stays `id` → `ID` → `INDEX` → `N_ID`; the warning above
+  makes the ambiguity visible instead of resolving it silently.
+- `rowRef` / `colRef` maps on the data — refs stored on row objects break memoization and
+  serialization. Use the [imperative handle](#imperative-handle-ref) (`getRowElement`,
+  `getCellElement`) or `onRowMount`.
+- Per-row `Componet` renderer maps — a reserved key on the data. Per-column `cell` with the
+  row in its props covers every use.
+- `runOnRender` — side effects during render, with no cleanup, repeated on every scroll.
+  Use `onRowMount` / `onRowUnmount` or effects inside a `cell` component.
 
 Every body row has the class `btt-row` plus `btt-row--odd` or `btt-row--even` by its
 position in the displayed list (the first row is odd). The row that shows the empty message
@@ -202,6 +242,9 @@ or the load error has the class `btt-empty-row` instead.
 | `getRowId` | `id`/`ID`/`INDEX`/`N_ID`, else map key, else index | Row id; see [Rows and ids](#rows-and-ids). |
 | `rowClassName` | – | `(row, index) => class`. Keep it stable. |
 | `rowProps` | – | `(row, index) => <tr> attributes`. Keep it stable. |
+| `rowTone` | – | `(row, index) => 'danger' \| 'warning' \| 'success' \| 'info' \| undefined`. Keep it stable. |
+| `onRowMount` / `onRowUnmount` | – | `(row, element, rowId)` / `(row, rowId)` as a data row mounts / unmounts; see [Rows and ids](#rows-and-ids). |
+| `ref` | – | A `BTTableHandle`; see [Imperative handle](#imperative-handle-ref). |
 
 ### Toolbar, search and paging
 
@@ -612,7 +655,7 @@ carry a time of day), everything else becomes its display text, never a React no
   happens when the response for the new view arrives.
 
 **Keep these props stable** (module-level constants, `useMemo` or `useCallback`):
-`columns`, `rows`, `getRowId`, `rowClassName`, `rowProps`. Rows are memoized on their
+`columns`, `rows`, `getRowId`, `rowClassName`, `rowProps`, `rowTone`. Rows are memoized on their
 identity: a new `columns` array or callback re-renders every row, and a new `rows` array or
 `getRowId` re-filters, re-sorts and re-derives the whole list on every parent render.
 
@@ -620,6 +663,32 @@ identity: a new `columns` array or callback re-renders every row, and a new `row
 const columns = useMemo(() => buildColumns(t), [t]);
 const rowProps = useCallback((row: Person) => ({ onClick: () => open(row.id) }), [open]);
 ```
+
+## Imperative handle (ref)
+
+```tsx
+import { BTTable, type BTTableHandle } from '@kardebadas/bttable';
+
+const table = useRef<BTTableHandle>(null);
+<BTTable<Person> ref={table} columns={columns} rows={people} />;
+
+table.current?.scrollToRow(personId, { align: 'center' });
+```
+
+The handle has no row type, so `useRef<BTTableHandle>(null)` is all the typing it needs; the
+row type `R` is still inferred from `columns` / `rows` (or given as `<BTTable<Person> …>`).
+It works with React 18 and 19.
+
+| Method | Meaning |
+| --- | --- |
+| `scrollToRow(id, { align? })` | Scrolls the row into view below the sticky header; `align` is `'start'` (default), `'center'`, `'end'` or `'nearest'`. A virtualized row that is not mounted yet is mounted first. In client mode a row on another page moves the table to that page (reported through `onPageChange`). Returns `false` when the row is not displayed: filtered out, unknown, or in server and manual mode not on the current page (the table cannot know which page holds it: change `page` yourself, then call it again once that page has loaded). When the row had to be mounted or paged to, the scroll lands after the next render. With a controlled `page`, apply the new page in `onPageChange` itself (set state there, in the same update): a page applied later finds the request already dropped, and the call does nothing. With `maxHeight: 'none'` it calls the row's `scrollIntoView`. |
+| `getRowElement(id)` | The row's `<tr>`, or `null` when it is not mounted (another page, or outside the virtual window). |
+| `getCellElement(id, columnKey)` | The row's `<td>` for that column, or `null`. |
+| `focusCell(id, columnKey)` | `scrollToRow(id, { align: 'nearest' })`, then focuses the cell's first focusable element (link, button, input…), else the cell itself (given `tabIndex=-1`). `false` like `scrollToRow`, or for an unknown column. |
+| `clearSelection()` | Unselects every row, reported through `onSelectionChange`. |
+| `resetView()` | What a new `resetKey` does: search and filters back to their defaults, page 1, scroll to the top; server and manual mode send the query again. Sort and page size stay. |
+
+The handle is `null` while the table shows its render-error fallback.
 
 ## Labels (i18n)
 
@@ -693,13 +762,14 @@ plain rule wins:
 | `--btt-danger` | `#c42b1c` | Error text (and a tinted error background). |
 | `--btt-muted` | `#5a6876` | Secondary text: counter, labels, status. |
 | `--btt-radius` | `6px` | Corner radius. |
+| `--btt-tone-<tone>-bg` / `-fg` | e.g. danger `#fde8e6` / `#8c1d12` | Background and text of `rowTone` rows, for `danger`, `warning`, `success`, `info` (dark values too; every pair at least 4.5:1, also against the selected-row tint, which replaces the tone background while the text keeps the tone colour). |
 
 **Dark mode** follows `prefers-color-scheme: dark` by redefining the same variables. To force
 one scheme regardless of the system, add `btt-theme-light` or `btt-theme-dark` to
 `className`. Animations (the loading spinner, hover fades) run only when the user has not
 asked for reduced motion.
 
-Row striping, hover, the selected-row tint and the cell grid lines have zero specificity
+Row striping, hover, row tones, the selected-row tint and the cell grid lines have zero specificity
 (`:where()`), so a `rowClassName` or `cellClassName` style of yours wins over them without
 `!important`.
 
@@ -755,6 +825,7 @@ Besides `BTTable` and its types (`BTTableProps`, `BTTableClientProps`, `BTTableS
 `BTTableCommonProps`, `SelectionBarContext`, `Column`, `CellContext`, `FilterSpec`,
 `FilterState`, `FilterValue`, `Option`, `TextOp`, `NumberOp`, `DateOp`, `SortState`, `Query`,
 `FetchResult`, `FetchRows`, `ExportData`, `RowId`, `RowSource`, `CellHandler`, `RowAttributes`, `ClientTableState`,
+`BTTableHandle`, `RowAlign`, `RowTone`, `RowMount`, `RowUnmount`,
 `BTTableLabels`, `VirtualizeMode`), the package exports `DEFAULT_LABELS` and the helpers it
 uses itself:
 

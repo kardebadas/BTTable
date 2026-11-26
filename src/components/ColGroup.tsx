@@ -36,7 +36,7 @@ export function ColGroup<R>({ columns, selectable }: ColGroupProps<R>) {
       {selectable && <col className="btt-col-select" style={{ width: SELECT_COLUMN_WIDTH }} />}
       {columns.map((column) => {
         const width = toCssSize(column.width);
-        return <col key={column.key} style={width === undefined ? undefined : { width }} />;
+        return <col key={column.key} className={column.colClassName} style={width === undefined ? undefined : { width }} />;
       })}
     </colgroup>
   );

@@ -1,9 +1,10 @@
-import { type HTMLAttributes, isValidElement, memo, type ReactNode, type TdHTMLAttributes } from 'react';
-import type { CellContext, Column } from '../core/types';
+import { type HTMLAttributes, memo, type ReactNode, useRef } from 'react';
+import type { Column } from '../core/types';
 import type { VirtualWindow } from '../core/virtual';
-import { formatValue, getColumnValue } from '../core/values';
 import type { RowEntry, RowId } from '../hooks/rowModel';
-import { alignClass, cx } from './classNames';
+import { type RowLifecycle, useRowEffects } from '../hooks/useRowLifecycle';
+import { Cell } from './Cell';
+import { cx } from './classNames';
 
 /** Attributes for a body `<tr>`, including `data-*` attributes such as `data-testid`. */
 export type RowAttributes = HTMLAttributes<HTMLTableRowElement> & {
@@ -16,37 +17,21 @@ export type RowCallbacks<R> = {
   rowClassName?: (row: R, index: number) => string | undefined;
   /** Should be stable (memoized): rows are memoized on its identity, so a new function re-renders every row. */
   rowProps?: (row: R, index: number) => RowAttributes;
+  /**
+   * A tone for the row: class `btt-row--tone-<tone>`, coloured by the `--btt-tone-*`
+   * variables. Should be stable (memoized), like `rowClassName`.
+   */
+  rowTone?: (row: R, index: number) => RowTone | undefined;
 };
 
-function cellContent<R>(ctx: CellContext<R>): ReactNode {
-  if (ctx.column.render) return ctx.column.render(ctx);
-  if (isValidElement(ctx.value)) return ctx.value;
-  return formatValue(ctx.value);
-}
+/** Row tones of `rowTone`. */
+export type RowTone = 'danger' | 'warning' | 'success' | 'info';
 
-/** The column's `onCellClick` / `onCellChange` / `onCellBlur`, bound to this cell; none when unset. */
-function cellHandlers<R>(ctx: CellContext<R>): TdHTMLAttributes<HTMLTableCellElement> {
-  const { onCellClick, onCellChange, onCellBlur } = ctx.column;
-  return {
-    onClick: onCellClick && ((event) => onCellClick(event, ctx)),
-    onChange: onCellChange && ((event) => onCellChange(event, ctx)),
-    onBlur: onCellBlur && ((event) => onCellBlur(event, ctx)),
-  };
-}
+const TONES: ReadonlySet<string> = new Set<RowTone>(['danger', 'warning', 'success', 'info']);
 
-/** One body cell: content, classes and the column's cell handlers. */
-function Cell<R>({ column, entry }: { column: Column<R>; entry: RowEntry<R> }) {
-  const ctx: CellContext<R> = { row: entry.row, value: getColumnValue(column, entry.row), rowIndex: entry.index, rowId: entry.id, column };
-  return (
-    <td className={cx('btt-cell', alignClass(column.align), cellClass(column, entry.row))} {...cellHandlers(ctx)}>
-      {cellContent(ctx)}
-    </td>
-  );
-}
-
-function cellClass<R>(column: Column<R>, row: R): string | undefined {
-  if (typeof column.cellClassName === 'function') return column.cellClassName(row);
-  return column.cellClassName;
+/** The tone class of a row; none for no tone or an unknown one. */
+function toneClass(tone: string | undefined): string | undefined {
+  return tone !== undefined && TONES.has(tone) ? `btt-row--tone-${tone}` : undefined;
 }
 
 /** Row checkboxes of the selection column. */
@@ -82,14 +67,22 @@ type RowProps<R> = RowCallbacks<R> & {
   selected: boolean;
   onToggleRow?: (id: RowId) => void;
   selectRowLabel?: string;
+  /** Stable: where the row registers its `<tr>` and reports its mount. */
+  lifecycle?: RowLifecycle<R>;
 };
 
-function Row<R>({ entry, columns, position, headerRows, selectable, rowClassName, rowProps, ...select }: RowProps<R>) {
-  const attributes = rowProps?.(entry.row, entry.index) ?? {};
+function rowClasses<R>({ entry, position, rowClassName, rowTone }: RowProps<R>, extra: string | undefined): string {
   const parity = position % 2 === 0 ? 'btt-row--odd' : 'btt-row--even';
-  const className = cx('btt-row', parity, rowClassName?.(entry.row, entry.index), attributes.className);
+  return cx('btt-row', parity, toneClass(rowTone?.(entry.row, entry.index)), rowClassName?.(entry.row, entry.index), extra);
+}
+
+function Row<R>(props: RowProps<R>) {
+  const { entry, columns, position, headerRows, selectable, ...select } = props;
+  const rowRef = useRef<HTMLTableRowElement>(null);
+  useRowEffects(entry, rowRef, props.lifecycle);
+  const attributes = props.rowProps?.(entry.row, entry.index) ?? {};
   return (
-    <tr {...attributes} className={className} aria-rowindex={position + headerRows + 1}>
+    <tr {...attributes} ref={rowRef} className={rowClasses(props, attributes.className)} aria-rowindex={position + headerRows + 1}>
       {selectable && <SelectCell id={entry.id} selected={select.selected} onToggle={select.onToggleRow} label={select.selectRowLabel} />}
       {columns.map((column) => (
         <Cell key={column.key} column={column} entry={entry} />
@@ -118,6 +111,8 @@ export type TableBodyProps<R> = RowCallbacks<R> & {
   className?: string;
   /** Placeholder rows drawn while loading with no rows to show. Default 0. */
   skeletonRows?: number;
+  /** Stable: where the rows register their `<tr>` and report their mounts. */
+  lifecycle?: RowLifecycle<R>;
 };
 
 /**
