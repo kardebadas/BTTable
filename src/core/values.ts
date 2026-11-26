@@ -14,15 +14,6 @@ export function ownRowId(row: unknown): string | number | undefined {
   return undefined;
 }
 
-/**
- * Default row id: the first string or number among `row.id`, `row.ID`, `row.INDEX`,
- * `row.N_ID`, else the row's index. Selection needs stable ids; the index fallback is
- * positional and changes when rows are reordered or replaced.
- */
-export function getRowId(row: unknown, index: number): string | number {
-  return ownRowId(row) ?? index;
-}
-
 /** The raw value of `column` for `row`: `column.value(row)`, else `row[column.key]`. */
 export function getColumnValue<R>(column: Column<R>, row: R): unknown {
   if (column.value) return column.value(row);

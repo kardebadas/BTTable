@@ -23,6 +23,7 @@ mounted.
 - [Search and sorting](#search-and-sorting)
 - [Controlled view state](#controlled-view-state)
 - [Server mode](#server-mode)
+- [Manual mode](#manual-mode)
 - [Selection](#selection)
 - [Export](#export)
 - [Layout, virtualization and performance](#layout-virtualization-and-performance)
@@ -186,7 +187,8 @@ or the load error has the class `btt-empty-row` instead.
 
 ## Table props
 
-`BTTableProps<R>`. Everything except `columns` and one of `rows` / `fetchRows` is optional.
+`BTTableProps<R>`. Everything except `columns` and one of `rows` / `fetchRows` is optional
+(manual mode also needs `mode="manual"` and `onQueryChange`).
 
 ### Data
 
@@ -195,6 +197,8 @@ or the load error has the class `btt-empty-row` instead.
 | `columns` | required | Column definitions. Keep the array stable (module-level or `useMemo`). |
 | `rows` | – | Client mode data: an array or an object map (keys are the id fallback). Keep the array stable: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
 | `fetchRows` | – | Server mode data source; see [Server mode](#server-mode). A new function identity does not refetch. |
+| `mode` | – | `"manual"`: the parent loads each page; see [Manual mode](#manual-mode). |
+| `totalRows` / `totalFilteredRows` | – | Manual mode only: the totals of the page the parent passes. |
 | `getRowId` | `id`/`ID`/`INDEX`/`N_ID`, else map key, else index | Row id; see [Rows and ids](#rows-and-ids). |
 | `rowClassName` | – | `(row, index) => class`. Keep it stable. |
 | `rowProps` | – | `(row, index) => <tr> attributes`. Keep it stable. |
@@ -277,8 +281,8 @@ each callback fires on every change the table makes, controlled or not.
 | Prop | Mode | Meaning |
 | --- | --- | --- |
 | `onStateChange` | client | `(state) => void` at mount and after each change, with `{ search, filters, sort, page, pageSize, filteredRows }` (`filteredRows`: every row passing search and filters, sorted). |
-| `refreshKey` | server | Change it to send the current query again. |
-| `onQueryChange` | server | `(query) => void` with each query sent to `fetchRows` (for URL sync, logging…). |
+| `refreshKey` | server, manual | Change it to send (manual: emit) the current query again. |
+| `onQueryChange` | server, manual | `(query) => void` with each query sent to `fetchRows` (for URL sync, logging…). Required in manual mode: each query the parent must load. |
 
 ## Filters
 
@@ -443,6 +447,80 @@ Behaviour:
 - **Pagination is always on.** `pagination={false}` is ignored (development warning).
 - **Export covers the current page only**, and select-all selects the current page; see
   [Export](#export) and [Selection](#selection).
+
+## Manual mode
+
+When the data lives in your own state (a store, a query cache, a websocket feed), let the
+parent load the pages: `mode="manual"`. The table never fetches. It calls `onQueryChange` with
+the same [`Query`](#server-mode) as server mode, on the same schedule — once at mount, typing
+debounced by `searchDebounceMs`, page, sort and the other changes at once, again on
+`refreshKey` and `resetKey` — and renders whatever page you pass back.
+
+| Prop | Meaning |
+| --- | --- |
+| `mode` | `"manual"`. |
+| `onQueryChange` | Required. `(query) => void`: load this page. |
+| `rows` | The current page: an array or an object map (keys are the id fallback). |
+| `totalRows` | Rows before search and filters (the counter's "filtered from"). |
+| `totalFilteredRows` | Rows matching search and filters; default `totalRows`. Drives the counter and the page count. |
+| `loading` | `true` while the page loads. The page clamp waits for it to be `false`. |
+
+`rows` + `fetchRows`, and `mode="manual"` without `onQueryChange`, are type errors (and render
+the error fallback at runtime).
+
+```tsx
+type UsersPage = { query: Query | null; rows: User[]; total?: number; filtered?: number; error?: boolean };
+
+function Users() {
+  const [query, setQuery] = useState<Query | null>(null);
+  const [page, setPage] = useState<UsersPage>({ query: null, rows: [] });
+  useEffect(() => {
+    if (!query) return;
+    let current = true; // false once a newer query (or unmount) replaces this one
+    api.users(query).then(
+      (result) => current && setPage({ query, rows: result.rows, total: result.total, filtered: result.filtered }),
+      // A failure answers the query too, so loading ends.
+      () => current && setPage({ query, rows: [], error: true }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [query]);
+  // Loading until the page on screen answers the latest query (and before the first one).
+  const loading = query === null || page.query !== query;
+  return (
+    <BTTable
+      columns={columns}
+      mode="manual"
+      rows={page.rows}
+      totalRows={page.total}
+      totalFilteredRows={page.filtered}
+      loading={loading}
+      emptyMessage={page.error ? 'Could not load the users.' : undefined}
+      onQueryChange={setQuery}
+    />
+  );
+}
+```
+
+Rules shared with server mode:
+
+- **Stale responses are your job.** The table cannot tell which query your rows answer: drop
+  a response whose query is no longer the latest, as above (or abort it with an
+  `AbortController`). Pass `loading` while a page loads, and end it on failure too (store the
+  failed query, as above), or the table stays loading.
+- **Counter and pages** come from the totals; without a valid total the counter counts the
+  rows up to this page, and a full page offers one more page after it. Before the first page
+  arrives (`loading` and no rows) the counter is hidden.
+- **Page clamping.** When totals that answer the current query (props changed after it was
+  emitted, and `loading` is false) report fewer pages than the current page, the table moves
+  to the last page: `onPageChange` and `onQueryChange` report it. Totals passed before the
+  query (at mount, or before a URL changes page and filters) never clamp it.
+- **Pagination is always on** (`pagination={false}` is ignored, development warning),
+  select-all selects the current page, selected ids on other pages stay selected, and export
+  covers the current page only.
+- **Controlled view state** works as in the other modes: a parent that ignores a proposed
+  change sees no new query.
 
 ## Selection
 

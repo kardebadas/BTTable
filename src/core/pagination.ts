@@ -28,7 +28,8 @@ export function paginate<R>(rows: readonly R[], page: number, pageSize: number):
 export type CounterInput = {
   page: number;
   pageSize: number;
-  total: number;
+  /** Missing or invalid: counted from `pageRowCount`. */
+  total?: number;
   unfilteredTotal?: number;
   pageRowCount?: number;
 };

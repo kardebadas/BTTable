@@ -26,4 +26,21 @@ describe('BTTableProps', () => {
     const wrong = <BTTable columns={COLUMNS} rows={{ a: 1 }} />;
     expect([map, wrong]).toHaveLength(2);
   });
+
+  it('accepts manual mode with rows and onQueryChange and rejects the wrong combinations', () => {
+    const onQueryChange = () => {};
+    const manual = <BTTable columns={COLUMNS} mode="manual" rows={ROWS} totalRows={1} totalFilteredRows={1} loading onQueryChange={onQueryChange} />;
+    const manualMap = <BTTable columns={COLUMNS} mode="manual" rows={{ a: ROWS[0] }} onQueryChange={onQueryChange} />;
+    // @ts-expect-error -- manual mode needs onQueryChange
+    const noCallback = <BTTable columns={COLUMNS} mode="manual" rows={ROWS} />;
+    // @ts-expect-error -- manual mode needs rows
+    const noRows = <BTTable columns={COLUMNS} mode="manual" onQueryChange={onQueryChange} />;
+    // @ts-expect-error -- manual mode never takes fetchRows
+    const withFetch = <BTTable columns={COLUMNS} mode="manual" rows={ROWS} fetchRows={fetchRows} onQueryChange={onQueryChange} />;
+    // @ts-expect-error -- totals belong to manual mode
+    const clientTotals = <BTTable columns={COLUMNS} rows={ROWS} totalRows={1} />;
+    // @ts-expect-error -- server mode takes no mode
+    const serverManual = <BTTable columns={COLUMNS} fetchRows={fetchRows} mode="manual" onQueryChange={onQueryChange} />;
+    expect([manual, manualMap, noCallback, noRows, withFetch, clientTotals, serverManual]).toHaveLength(7);
+  });
 });

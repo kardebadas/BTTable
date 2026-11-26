@@ -8,7 +8,7 @@ import type { ClientTableState } from './hooks/useClientTable';
 import type { ViewStateProps } from './hooks/viewState';
 import type { BTTableLabels } from './labels';
 
-/** Props of `BTTable` shared by both data modes. */
+/** Props of `BTTable` shared by every data mode. */
 export type BTTableCommonProps<R> = RowCallbacks<R> &
   ControlProps &
   ViewStateProps & {
@@ -22,7 +22,7 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
    * re-derives every row on every parent render.
    */
   getRowId?: (row: R, index: number) => RowId;
-  /** Client mode only: `false` shows every filtered row. Server mode always paginates (development warning). */
+  /** Client mode only: `false` shows every filtered row. Server and manual mode always paginate (development warning). */
   pagination?: boolean;
   pageSize?: number;
   searchDebounceMs?: number;
@@ -31,13 +31,16 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
    * `defaultFilters`, column defaults) and goes back to page 1, keeping sort and page size.
    */
   resetKey?: unknown;
-  /** Server mode: changing it sends the current query again. */
+  /** Server and manual mode: changing it sends (manual: emits) the current query again. */
   refreshKey?: unknown;
-  /** Server mode: called with each query sent to `fetchRows` (for URL sync etc.). */
+  /**
+   * Server mode: called with each query sent to `fetchRows` (for URL sync etc.). Manual
+   * mode (required): called with each query the parent must load.
+   */
   onQueryChange?: (query: Query) => void;
   onStateChange?: (state: ClientTableState<R>) => void;
   /**
-   * Checkbox column. In server mode select-all covers the current page, and selected ids
+   * Checkbox column. In server and manual mode select-all covers the current page, and selected ids
    * are never pruned (rows on other pages are not loaded): clear stale ids through a
    * controlled `selectedIds`.
    */
@@ -53,6 +56,7 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
   virtualizeThreshold?: number;
   /** Px assumed for a row until it is measured; real heights replace it. Default 40. */
   estimatedRowHeight?: number;
+  /** Shows the loading state. Manual mode: pass `true` while the parent loads a page. */
   loading?: boolean;
   emptyMessage?: ReactNode;
   /** Visually hidden table caption, for assistive technology. */
@@ -76,16 +80,46 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
  * re-sorts every row; it keeps the scroll position unless the view (page, sort, search,
  * filters) changes.
  */
-export type BTTableClientProps<R> = BTTableCommonProps<R> & { rows: RowSource<R>; fetchRows?: never };
+export type BTTableClientProps<R> = BTTableCommonProps<R> & { rows: RowSource<R>; fetchRows?: never } & NoManualProps;
 
 /**
  * Server mode: the data source, called for each page. A new function identity does not
  * refetch: change `refreshKey` to refetch (e.g. when the fetcher captures a tenant id).
  */
-export type BTTableServerProps<R> = BTTableCommonProps<R> & { fetchRows: FetchRows<R>; rows?: never };
+export type BTTableServerProps<R> = BTTableCommonProps<R> & { fetchRows: FetchRows<R>; rows?: never } & NoManualProps;
 
-/** Props of `BTTable`: exactly one of `rows` (client mode) or `fetchRows` (server mode). */
-export type BTTableProps<R> = BTTableClientProps<R> | BTTableServerProps<R>;
+/** The manual-mode props, absent in the other modes. */
+type NoManualProps = { mode?: never; totalRows?: never; totalFilteredRows?: never };
 
-/** The props as the table reads them inside: either source, checked at runtime. */
-export type BTTableAnyProps<R> = BTTableCommonProps<R> & { rows?: RowSource<R>; fetchRows?: FetchRows<R> };
+/**
+ * Manual mode: the parent loads each page. The table never fetches: it calls
+ * `onQueryChange` with the same `Query` as server mode, on the same schedule, and renders
+ * the `rows` passed back (one page, an array or a map) with their totals. Missing totals
+ * count the rows up to this page and offer a next page after a full one. Pass `loading`
+ * while a page loads; dropping stale responses is the parent's job.
+ */
+export type BTTableManualProps<R> = BTTableCommonProps<R> & {
+  mode: 'manual';
+  rows: RowSource<R>;
+  fetchRows?: never;
+  onQueryChange: (query: Query) => void;
+  /** Rows before search and filters; the counter's "filtered from". */
+  totalRows?: number;
+  /** Rows matching search and filters; default `totalRows`. Pages and the counter come from it. */
+  totalFilteredRows?: number;
+};
+
+/**
+ * Props of `BTTable`: `rows` (client mode), `fetchRows` (server mode), or `mode="manual"`
+ * with `rows` and `onQueryChange` (manual mode).
+ */
+export type BTTableProps<R> = BTTableClientProps<R> | BTTableServerProps<R> | BTTableManualProps<R>;
+
+/** The props as the table reads them inside: any mode, checked at runtime. */
+export type BTTableAnyProps<R> = BTTableCommonProps<R> & {
+  rows?: RowSource<R>;
+  fetchRows?: FetchRows<R>;
+  mode?: 'manual';
+  totalRows?: number;
+  totalFilteredRows?: number;
+};

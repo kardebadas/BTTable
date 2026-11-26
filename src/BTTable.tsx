@@ -7,12 +7,14 @@ import { TableBody } from './components/TableBody';
 import { TableHead } from './components/TableHead';
 import { buildExportData } from './core/export';
 import { getCounter } from './core/pagination';
-import type { FetchRows, SortState } from './core/types';
+import type { FetchRows, Query, SortState } from './core/types';
 import { ownRowId } from './core/values';
 import { shouldVirtualize } from './core/virtual';
 import type { RowEntry, RowSource } from './hooks/rowModel';
 import { type ClientTable as ClientTableModel, useClientTable } from './hooks/useClientTable';
-import { type ServerTable as ServerTableModel, useServerTable } from './hooks/useServerTable';
+import { useManualTable } from './hooks/useManualTable';
+import type { PagedTable } from './hooks/usePagedTable';
+import { useServerTable } from './hooks/useServerTable';
 import { isDevelopment, useRowWarnings } from './hooks/useRowWarnings';
 import { useVirtualRows } from './hooks/useVirtualRows';
 import type { BTTableAnyProps, BTTableProps } from './BTTableProps';
@@ -33,8 +35,16 @@ type ViewProps<R> = ContentProps<R> & {
 /** The status strip always keeps one line of height, so loading never shifts the table. */
 const STATUS_STYLE = { minHeight: '1.5em' } as const;
 
-/** Throws when not exactly one of `rows` / `fetchRows` is passed. */
-function assertOneSource<R>({ rows, fetchRows }: BTTableAnyProps<R>): void {
+/** Throws unless manual mode has `rows` and `onQueryChange` and no `fetchRows`. */
+function assertManual<R>({ rows, fetchRows, onQueryChange }: BTTableAnyProps<R>): void {
+  if (rows !== undefined && rows !== null && !fetchRows && typeof onQueryChange === 'function') return;
+  throw new Error('BTTable: mode="manual" needs `rows` and `onQueryChange`, and no `fetchRows`.');
+}
+
+/** Throws when the props pick no valid mode: not exactly one of `rows` / `fetchRows`, or a bad manual mode. */
+function assertOneSource<R>(props: BTTableAnyProps<R>): void {
+  if (props.mode === 'manual') return assertManual(props);
+  const { rows, fetchRows } = props;
   const hasRows = rows !== undefined && rows !== null;
   if (hasRows !== Boolean(fetchRows)) return;
   const got = hasRows ? 'both' : 'neither';
@@ -157,10 +167,10 @@ function LoadError({ labels, onRetry }: { labels: BTTableLabels; onRetry: () => 
 }
 
 /**
- * Controls of server mode. Export (CSV and `onExport`) covers the rows of the current page
- * only: the other pages live on the server.
+ * Controls of server and manual mode. Export (CSV and `onExport`) covers the rows of the
+ * current page only: the other pages live on the server.
  */
-function serverControls<R>(table: ServerTableModel<R>, props: ContentProps<R>): TableControls {
+function serverControls<R>(table: PagedTable<R>, props: ContentProps<R>): TableControls {
   const exportData = () => buildExportData(props.columns, table.pageRows.map((entry) => entry.row));
   return { ...table, exportData };
 }
@@ -175,13 +185,16 @@ function useWarnOnce(condition: boolean, message: string): void {
   }, [condition, message]);
 }
 
-/** Development warnings of server mode: ignored `pagination={false}` and selectable rows without ids. */
+/** Development warnings of server and manual mode: ignored `pagination={false}` and selectable rows without ids. */
 function useServerWarnings<R>(props: ContentProps<R>, pageRows: readonly RowEntry<R>[]): void {
-  useWarnOnce(props.pagination === false, 'BTTable: pagination={false} is ignored in server mode; pages always come from fetchRows.');
-  const missingIds = Boolean(props.selectable) && !props.getRowId && pageRows.some((entry) => ownRowId(entry.row) === undefined);
+  const [mode, source] = props.mode === 'manual' ? ['manual', 'the parent'] : ['server', 'fetchRows'];
+  useWarnOnce(props.pagination === false, `BTTable: pagination={false} is ignored in ${mode} mode; pages always come from ${source}.`);
+  // Rows given as a map take their ids from the keys.
+  const isMap = Boolean(props.rows) && !Array.isArray(props.rows);
+  const missingIds = Boolean(props.selectable) && !props.getRowId && !isMap && pageRows.some((entry) => ownRowId(entry.row) === undefined);
   useWarnOnce(
     missingIds,
-    'BTTable: selectable server rows need ids: give rows an id/ID/INDEX/N_ID field or pass getRowId, or selections collide across pages.',
+    'BTTable: selectable paged rows need ids: give rows an id/ID/INDEX/N_ID field or pass getRowId, or selections collide across pages.',
   );
 }
 
@@ -195,9 +208,21 @@ function ServerTable<R>(props: ContentProps<R> & { fetchRows: FetchRows<R> }) {
   return <TableView {...props} {...view} controls={serverControls(table, props)} />;
 }
 
-/** Validates the mode, then renders client mode (`rows`) or server mode (`fetchRows`). */
+type ManualContentProps<R> = ContentProps<R> & { rows: RowSource<R>; onQueryChange: (query: Query) => void };
+
+/** Manual mode: server mode's controls over the page the parent passes; `loading` comes from the parent. */
+function ManualTable<R>(props: ManualContentProps<R>) {
+  const table = useManualTable(props);
+  useServerWarnings(props, table.pageRows);
+  useRowWarnings(props.rows, table.pageRows);
+  const view = { entries: table.pageRows, viewKey: table.viewKey, sort: table.sort, onSort: table.toggleSort, pagination: true };
+  return <TableView {...props} {...view} controls={serverControls(table, props)} />;
+}
+
+/** Validates the mode, then renders manual mode, client mode (`rows`) or server mode (`fetchRows`). */
 function TableContent<R>(props: ContentProps<R>) {
   assertOneSource(props);
+  if (props.mode === 'manual') return <ManualTable {...(props as ManualContentProps<R>)} />;
   if (props.rows) return <ClientTable {...props} rows={props.rows} />;
   return <ServerTable {...props} fetchRows={props.fetchRows as FetchRows<R>} />;
 }
@@ -206,7 +231,8 @@ function TableContent<R>(props: ContentProps<R>) {
  * Fixed-layout data table. Column widths come only from `columns` (a `<colgroup>` under
  * `table-layout: fixed`), so headers never move with the mounted rows; the `<thead>` is
  * sticky inside one scroll container. Render errors show a fallback and call `onError`;
- * passing both or neither of `rows` / `fetchRows` is such an error.
+ * passing both or neither of `rows` / `fetchRows`, or `mode="manual"` without `rows` and
+ * `onQueryChange`, is such an error.
  */
 export function BTTable<R>(props: BTTableProps<R>) {
   const labels = { ...DEFAULT_LABELS, ...props.labels };

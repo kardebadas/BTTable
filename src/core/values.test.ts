@@ -1,23 +1,23 @@
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import type { Column } from './types';
-import { formatValue, getColumnValue, getRowId, toNumber } from './values';
+import { formatValue, getColumnValue, ownRowId, toNumber } from './values';
 
 type Row = Record<string, unknown>;
 
-describe('getRowId', () => {
+describe('ownRowId', () => {
   it('prefers id, then ID, INDEX, N_ID', () => {
-    expect(getRowId({ id: 'a', ID: 'b' }, 3)).toBe('a');
-    expect(getRowId({ ID: 7, INDEX: 8 }, 3)).toBe(7);
-    expect(getRowId({ INDEX: 0, N_ID: 9 }, 3)).toBe(0);
-    expect(getRowId({ N_ID: 'n' }, 3)).toBe('n');
+    expect(ownRowId({ id: 'a', ID: 'b' })).toBe('a');
+    expect(ownRowId({ ID: 7, INDEX: 8 })).toBe(7);
+    expect(ownRowId({ INDEX: 0, N_ID: 9 })).toBe(0);
+    expect(ownRowId({ N_ID: 'n' })).toBe('n');
   });
 
-  it('falls back to the index when no usable id exists', () => {
-    expect(getRowId({ name: 'x' }, 4)).toBe(4);
-    expect(getRowId({ id: null, ID: { nested: 1 } }, 5)).toBe(5);
-    expect(getRowId(null, 6)).toBe(6);
-    expect(getRowId('text', 7)).toBe(7);
+  it('is undefined when no usable id exists', () => {
+    expect(ownRowId({ name: 'x' })).toBeUndefined();
+    expect(ownRowId({ id: null, ID: { nested: 1 } })).toBeUndefined();
+    expect(ownRowId(null)).toBeUndefined();
+    expect(ownRowId('text')).toBeUndefined();
   });
 });
 

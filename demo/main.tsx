@@ -4,15 +4,17 @@ import '../src/styles/theme.css';
 import '../src/styles/table.css';
 import '../src/styles/controls.css';
 import { ClientDemo } from './ClientDemo';
+import { ManualDemo } from './ManualDemo';
 import './demo.css';
 import { ServerDemo } from './ServerDemo';
 
-type Tab = 'client' | 'server';
+type Tab = 'client' | 'server' | 'manual';
 type Theme = 'auto' | 'light' | 'dark';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'client', label: 'Client mode' },
   { id: 'server', label: 'Server mode' },
+  { id: 'manual', label: 'Manual mode' },
 ];
 
 /** The table class that forces a scheme; none follows the system. */
@@ -47,7 +49,9 @@ function App() {
         </label>
       </header>
       <div role="tabpanel">
-        {tab === 'client' ? <ClientDemo themeClass={themeClass(theme)} /> : <ServerDemo themeClass={themeClass(theme)} />}
+        {tab === 'client' && <ClientDemo themeClass={themeClass(theme)} />}
+        {tab === 'server' && <ServerDemo themeClass={themeClass(theme)} />}
+        {tab === 'manual' && <ManualDemo themeClass={themeClass(theme)} />}
       </div>
     </main>
   );

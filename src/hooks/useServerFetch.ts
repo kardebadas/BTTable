@@ -1,6 +1,6 @@
-import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react';
+import { type Dispatch, type SetStateAction, useState } from 'react';
 import type { FetchResult, FetchRows, Query } from '../core/types';
-import { useLatest } from './useLatest';
+import { useRequestSchedule } from './useRequestSchedule';
 
 /** Input of `useServerFetch`. */
 export type ServerFetchInput<R> = {
@@ -86,13 +86,6 @@ function sendRequest<R>({ input, requestKey, signal, setState }: SendInput<R>): 
     );
 }
 
-type Scheduled = { typedKey: string; generation: number };
-
-/** True when only typing changed the query since the last scheduled request (not a refresh, reset or retry). */
-function isTyping(last: Scheduled | null, next: Scheduled): boolean {
-  return last !== null && last.typedKey !== next.typedKey && last.generation === next.generation;
-}
-
 /**
  * The request state for `requestKey`, adjusted during render when the key changes: a key
  * whose result is already on screen needs no request; any other key is pending. A failure
@@ -116,25 +109,10 @@ function useFetchState<R>(requestKey: string) {
  * request is outstanding.
  */
 export function useServerFetch<R>(input: ServerFetchInput<R>): ServerFetch<R> {
-  const { queryKey, typedKey, generation } = input;
+  const { queryKey, typedKey, generation, delay } = input;
   const requestKey = `${generation}:${queryKey}`;
   const { state, setState } = useFetchState<R>(requestKey);
-  const latest = useLatest(input);
-  const pending = useLatest(state.pending);
-  const lastScheduled = useRef<Scheduled | null>(null);
-  useEffect(() => {
-    const next = { typedKey, generation };
-    const debounce = isTyping(lastScheduled.current, next);
-    lastScheduled.current = next;
-    if (!pending.current) return;
-    const controller = new AbortController();
-    const send = () => sendRequest({ input: latest.current, requestKey, signal: controller.signal, setState });
-    const timer = debounce ? setTimeout(send, latest.current.delay) : undefined;
-    if (!debounce) send();
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [requestKey, typedKey, generation, latest, pending, setState]);
+  const send = (signal: AbortSignal) => sendRequest({ input, requestKey, signal, setState });
+  useRequestSchedule({ requestKey, typedKey, generation, delay, needed: state.pending, send });
   return { result: state.result, viewKey: state.resultViewKey, loading: state.pending, error: state.error };
 }
