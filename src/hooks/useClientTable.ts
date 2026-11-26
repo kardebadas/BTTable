@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { clampPage, pageCount, paginate } from '../core/pagination';
 import type { Column, FilterState, SortState } from '../core/types';
 import { buildEntries, type RowEntry, type RowId, type RowSource } from './rowModel';
@@ -96,16 +96,32 @@ function useStateChange<R>(state: ReportedState<R>, onStateChange?: (state: Clie
   });
 }
 
-/** Builds the search texts of a new row index in short slices between frames, so the first search is fast. */
-function useWarmSearch<R>(index: RowIndex<R>): void {
+/**
+ * True from the first render whose search box text or applied search is not blank, and
+ * from then on: a table nobody searches never builds its search texts.
+ */
+function useSearchUsed(state: TableState): boolean {
+  const [used, setUsed] = useState(false);
+  const active = state.searchInput.trim() !== '' || state.search.trim() !== '';
+  if (active && !used) setUsed(true);
+  return used || active;
+}
+
+/**
+ * Once search is in use, builds the search texts of the row index in short slices between
+ * frames, so the keystrokes typed during the debounce do the work and later row lists are
+ * ready before the next search. Nothing is built before.
+ */
+function useWarmSearch<R>(index: RowIndex<R>, enabled: boolean): void {
   useEffect(() => {
+    if (!enabled) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const step = () => {
       if (!index.warmSearch(8)) timer = setTimeout(step, 0);
     };
     timer = setTimeout(step, 0);
     return () => clearTimeout(timer);
-  }, [index]);
+  }, [index, enabled]);
 }
 
 /** Searched → filtered → sorted rows, memoized per input, on per-row values cached in a `RowIndex`. */
@@ -113,7 +129,7 @@ function useFilteredRows<R>(options: UseClientTableOptions<R>, state: TableState
   const { rows, columns, getRowId } = options;
   const entries = useMemo(() => buildEntries(rows, getRowId), [rows, getRowId]);
   const index = useMemo(() => new RowIndex(entries, columns), [entries, columns]);
-  useWarmSearch(index);
+  useWarmSearch(index, useSearchUsed(state));
   const { search, filters, sort } = state;
   const searched = useMemo(() => index.search(search), [index, search]);
   const filtered = useMemo(() => index.filter(searched, filters), [index, searched, filters]);
