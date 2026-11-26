@@ -131,25 +131,29 @@ function useLandedClears(clears: number, query: Query, queryKey: string): number
   return next.landed;
 }
 
-/** The request generation: bumped by `refreshKey`, a reset (`resetKey`, `resetView`), Retry and a landed "Clear all", each sent at once. */
+/**
+ * The request generation, bumped by `refreshKey`, a reset (`resetKey`, `resetView`) and Retry:
+ * each sends the query again, at once. `landedClears` counts landed "Clear all" uses: each
+ * sends its query at once, but not again when it is the query already on screen.
+ */
 function useGeneration<R>(options: PagedTableOptions<R>, state: TableState, query: Query, queryKey: string) {
   const [retries, setRetries] = useState(0);
   const retry = useCallback(() => setRetries((count) => count + 1), []);
-  const generation = useChangeCount(options.refreshKey) + state.resets + useLandedClears(state.clears, query, queryKey) + retries;
-  return { generation, retry };
+  const generation = useChangeCount(options.refreshKey) + state.resets + retries;
+  return { generation, landedClears: useLandedClears(state.clears, query, queryKey), retry };
 }
 
 /**
  * The view state (`useTableState`) as a server `Query`, with the keys that schedule its
  * requests: `queryKey` (the query), `viewKey` (query plus resets), `typedKey` (the
- * debounced part) and `generation` (refresh, reset, retry, a landed "Clear all").
+ * debounced part), `generation` (refresh, reset, retry) and `landedClears`.
  */
 export function usePagedQuery<R>(options: PagedTableOptions<R>) {
   const { state, apply, actions } = useTableState(options);
   const query = buildQuery(state, options.columns);
   const queryKey = JSON.stringify(query);
-  const { generation, retry } = useGeneration(options, state, query, queryKey);
-  const keys = { queryKey, viewKey: `${state.resets}:${queryKey}`, typedKey: typedFiltersKey(query), generation };
+  const { generation, landedClears, retry } = useGeneration(options, state, query, queryKey);
+  const keys = { queryKey, viewKey: `${state.resets}:${queryKey}`, typedKey: typedFiltersKey(query), generation, landedClears };
   const delay = options.searchDebounceMs ?? DEFAULT_DEBOUNCE_MS;
   return { state, apply, actions, query, keys, delay, retry };
 }

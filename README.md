@@ -178,8 +178,10 @@ const columns: Column<Person>[] = [{ key: 'status', header: 'Status', cell: Stat
 ## Rows and ids
 
 - `rows: readonly R[] | Record<string, R>` — client mode data: an array, or an object map
-  whose values are the rows (in property order, so integer-like keys come first, ascending)
-  and whose keys are the id fallback. Entries that are `null` or not objects are skipped,
+  whose values are the rows and whose keys are the id fallback. Rows come in JavaScript
+  property order: integer-like keys (`'7'`, `'12'`) come first, in ascending numeric order,
+  before the other keys in insertion order — to control the order, pass an array or use
+  non-numeric keys. Entries that are `null` or not objects are skipped,
   with a warning in development (server mode warns the same way for each response).
 - `getRowId?: (row, index) => string | number` — the default is the first string or number
   among `row.id`, `row.ID`, `row.INDEX`, `row.N_ID`, else the map key (rows given as a map),
@@ -204,7 +206,9 @@ const columns: Column<Person>[] = [{ key: 'status', header: 'Status', cell: Stat
   virtualization they fire as rows enter and leave the mounted window (scrolling mounts and
   unmounts rows), and a page change unmounts the old page's rows. Every mount is paired
   with an unmount, StrictMode's double effects included. They need not be stable: rows read
-  the latest functions without re-rendering.
+  the latest functions without re-rendering. Rows already mounted when the callbacks are
+  first set get neither call; a row that got its mount still gets its unmount after
+  `onRowUnmount` is removed (the function it mounted with).
 - `rowProps?: (row, index) => attributes` — any `<tr>` attributes, including `onClick`,
   `data-*` and `className` (merged with the table's classes). `index` is the row's index in
   `rows` (server mode: on the page).
@@ -238,7 +242,7 @@ or the load error has the class `btt-empty-row` instead.
 | `columns` | required | Column definitions. Keep the array stable (module-level or `useMemo`). |
 | `rows` | – | Client mode data: an array or an object map (keys are the id fallback). Keep the array stable: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
 | `fetchRows` | – | Server mode data source; see [Server mode](#server-mode). A new function identity does not refetch. |
-| `fetchAllRows` | – | Server and manual mode: `(query, { signal }) => Promise<R[]>`, every row matching the query without paging, so exports cover every filtered row; see [Export](#export). Ignored in client mode. |
+| `fetchAllRows` | – | Server and manual mode: `(query, { signal }) => Promise<R[]>`, every row matching the query without paging, so exports cover every filtered row; see [Export](#export). Not accepted in client mode (a type error): client exports already cover every filtered row. |
 | `mode` | – | `"manual"`: the parent loads each page; see [Manual mode](#manual-mode). |
 | `totalRows` / `totalFilteredRows` | – | Manual mode only: the totals of the page the parent passes. |
 | `getRowId` | `id`/`ID`/`INDEX`/`N_ID`, else map key, else index | Row id; see [Rows and ids](#rows-and-ids). |

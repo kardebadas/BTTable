@@ -14,6 +14,8 @@ export type ServerFetchInput<R> = {
   typedKey: string;
   /** Bumped by refresh, reset and retry: a change sends the same query again, at once. */
   generation: number;
+  /** Bumped by a landed "Clear all": the next request is sent at once, never debounced. */
+  landedClears: number;
   delay: number;
   onQueryChange?: (query: Query) => void;
   /** Called with each accepted (current, well-formed) result. */
@@ -109,10 +111,10 @@ function useFetchState<R>(requestKey: string) {
  * request is outstanding.
  */
 export function useServerFetch<R>(input: ServerFetchInput<R>): ServerFetch<R> {
-  const { queryKey, typedKey, generation, delay } = input;
+  const { queryKey, typedKey, generation, landedClears, delay } = input;
   const requestKey = `${generation}:${queryKey}`;
   const { state, setState } = useFetchState<R>(requestKey);
   const send = (signal: AbortSignal) => sendRequest({ input, requestKey, signal, setState });
-  useRequestSchedule({ requestKey, typedKey, generation, delay, needed: state.pending, send });
+  useRequestSchedule({ requestKey, typedKey, generation, landedClears, delay, needed: state.pending, send });
   return { result: state.result, viewKey: state.resultViewKey, loading: state.pending, error: state.error };
 }

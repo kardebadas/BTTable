@@ -20,6 +20,10 @@ export type TableState = {
 export type Proposals = {
   /** The page prop the table moved away from; while the prop still equals it, the own page shows. */
   pageHold?: number;
+  /** The search prop a reset moved away from; while the prop still equals it, the own search shows. */
+  searchHold?: string;
+  /** The filters prop a reset moved away from; while the prop still equals it, the own filters show. */
+  filtersHold?: FilterState;
   /** Reported search values not yet echoed back, oldest first. */
   searches: readonly string[];
   /** Reported filter states not yet echoed back, oldest first. */

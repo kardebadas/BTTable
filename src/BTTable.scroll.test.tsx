@@ -99,3 +99,20 @@ describe('scroll position in server mode', () => {
     expect(scroller(container).scrollTop).toBe(0);
   });
 });
+
+describe('scroll position in manual mode', () => {
+  it('keeps the position while the old rows show and scrolls back to the top when the new page arrives', () => {
+    const element = (rows: ServerRow[]) => (
+      <BTTable columns={SERVER_COLUMNS} mode="manual" rows={rows} totalRows={1000} pageSize={500} rowProps={rowProps} onQueryChange={() => {}} />
+    );
+    const firstPage = serverRows(0, 500);
+    const { container, rerender } = render(element(firstPage));
+    scrollTo(container, 2000);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(scroller(container).scrollTop).toBe(2000);
+    rerender(element(firstPage));
+    expect(scroller(container).scrollTop).toBe(2000);
+    rerender(element(serverRows(500, 500)));
+    expect(scroller(container).scrollTop).toBe(0);
+  });
+});

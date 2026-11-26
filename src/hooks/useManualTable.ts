@@ -31,7 +31,7 @@ function useQueryEmitter<R>(options: UseManualTableOptions<R>, paged: PagedQuery
     emitted.current = requestKey;
     options.onQueryChange(query);
   };
-  useRequestSchedule({ requestKey, typedKey: keys.typedKey, generation: keys.generation, delay, needed: true, send });
+  useRequestSchedule({ requestKey, typedKey: keys.typedKey, generation: keys.generation, landedClears: keys.landedClears, delay, needed: true, send });
 }
 
 type Answer = { rows: unknown; totalRows: unknown; totalFilteredRows: unknown; loading: boolean };
@@ -71,6 +71,18 @@ function usePageClamp<R>(options: UseManualTableOptions<R>, paged: PagedQuery<R>
 }
 
 /**
+ * The view key current when the parent last changed `rows`: the view those rows show. Like
+ * server mode on a response, the scroll position resets when the new rows arrive, not while
+ * the old ones still show under the new query. Adjusted during render.
+ */
+function useRowsViewKey(rows: unknown, viewKey: string): string {
+  const [seen, setSeen] = useState({ rows, viewKey });
+  if (seen.rows === rows) return seen.viewKey;
+  setSeen({ rows, viewKey });
+  return viewKey;
+}
+
+/**
  * Manual-mode table: server mode without the fetch. The view state becomes the same `Query`
  * on the same schedule, handed to `onQueryChange`; the parent loads it and passes back
  * `rows`, the totals and `loading`. Counter, page count, page clamping and page-scoped
@@ -85,5 +97,5 @@ export function useManualTable<R>(options: UseManualTableOptions<R>): PagedTable
   // Like server mode before its first response: no counter while the first page loads.
   const showCounter = !loading || sourceSize(rows) > 0;
   const model = usePageModel(options, paged, { result: { rows, totalRows, totalFilteredRows }, rows, showCounter });
-  return { ...model, viewKey: paged.keys.viewKey, loading, error: false };
+  return { ...model, viewKey: useRowsViewKey(rows, paged.keys.viewKey), loading, error: false };
 }

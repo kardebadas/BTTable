@@ -286,6 +286,26 @@ describe('onRowMount and onRowUnmount', () => {
     expect(live.size).toBe(0);
   });
 
+  it('call nothing on unmount for rows mounted before the callbacks were set', () => {
+    const onRowMount = vi.fn();
+    const onRowUnmount = vi.fn();
+    const rows = makeRows(2);
+    const view = render(<BTTable columns={COLUMNS} rows={rows} />);
+    view.rerender(<BTTable columns={COLUMNS} rows={rows} onRowMount={onRowMount} onRowUnmount={onRowUnmount} />);
+    view.unmount();
+    expect(onRowMount).not.toHaveBeenCalled();
+    expect(onRowUnmount).not.toHaveBeenCalled();
+  });
+
+  it('still deliver the unmount of a mounted row after onRowUnmount is removed', () => {
+    const onRowUnmount = vi.fn();
+    const rows = makeRows(2);
+    const view = render(<BTTable columns={COLUMNS} rows={rows} onRowMount={() => {}} onRowUnmount={onRowUnmount} />);
+    view.rerender(<BTTable columns={COLUMNS} rows={rows} />);
+    view.unmount();
+    expect(onRowUnmount.mock.calls.map((call) => call[1])).toEqual([0, 1]);
+  });
+
   it('new callback identities do not re-render the rows', () => {
     const rowClassName = vi.fn(() => undefined);
     const rows = makeRows(3);

@@ -40,6 +40,14 @@ describe('package entry', () => {
     expect([align, tone]).toEqual(['center', 'info']);
   });
 
+  it('exports the types the props are built from', () => {
+    const onSelectionChange: api.SelectionChange<{ id: number }> = (ids, rows) => expect(rows).toHaveLength(ids.length);
+    onSelectionChange([1], [{ id: 1 }]);
+    const view: api.ViewStateProps & api.ViewStateCallbacks = { searchValue: 'a', onSearchChange: () => {} };
+    const groups: [api.RowCallbacks<unknown>, api.RowLifecycleProps<unknown>, api.ExpansionProps<unknown>, api.ControlProps] = [{}, {}, {}, { search: false }];
+    expect([view.searchValue, groups.length]).toEqual(['a', 4]);
+  });
+
   it('exports the default labels and the VirtualizeMode type', () => {
     expect(api.DEFAULT_LABELS.loading).toBe('Loading…');
     const mode: api.VirtualizeMode = 'auto';

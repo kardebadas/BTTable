@@ -166,6 +166,27 @@ describe('Clear all (server and manual mode)', () => {
     expect(onQueryChange).toHaveBeenCalledTimes(1);
   });
 
+  it('sends nothing when Clear all within the typing debounce leaves the query on screen', async () => {
+    const { calls } = renderServer({ pageSize: 2 });
+    await settle(calls[0], { rows: makeRows(1, 2), totalRows: 4 });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'a' } });
+    advance(100);
+    fireEvent.click(clearAllButton() as HTMLElement);
+    advance(1000);
+    expect(calls).toHaveLength(1);
+    expect(screen.getByLabelText('Name')).toHaveValue('');
+  });
+
+  it('emits nothing in manual mode when Clear all within the typing debounce leaves the query on screen', () => {
+    const onQueryChange = vi.fn<(query: Query) => void>();
+    render(<BTTable columns={COLUMNS} mode="manual" rows={makeRows(1, 2)} totalRows={2} onQueryChange={onQueryChange} />);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'a' } });
+    advance(100);
+    fireEvent.click(clearAllButton() as HTMLElement);
+    advance(1000);
+    expect(onQueryChange).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps later typing debounced after the parent rejects a controlled clear', async () => {
     const { calls, rerender } = renderServer({ pageSize: 2, filters: { name: 'row' }, onFiltersChange: vi.fn() });
     await settle(calls[0], { rows: makeRows(1, 2), totalRows: 4 });
@@ -257,6 +278,20 @@ describe('counter help', () => {
     expect(outside).not.toHaveBeenCalled();
     fireEvent.keyDown(helpButton(), { key: 'Escape' });
     expect(outside).toHaveBeenCalledTimes(1);
+    document.removeEventListener('keydown', outside);
+  });
+
+  it('lets an Escape aimed at another focused element through while only hovered', async () => {
+    const { calls } = renderServer();
+    await settle(calls[0], { rows: makeRows(1, 2), totalRows: 2 });
+    const outside = vi.fn();
+    document.addEventListener('keydown', outside);
+    fireEvent.mouseEnter(helpButton());
+    const filter = screen.getByLabelText('Name');
+    act(() => filter.focus());
+    fireEvent.keyDown(filter, { key: 'Escape' });
+    expect(outside).toHaveBeenCalledTimes(1);
+    expect(tooltip()).not.toBeVisible();
     document.removeEventListener('keydown', outside);
   });
 

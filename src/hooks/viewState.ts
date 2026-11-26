@@ -57,9 +57,14 @@ export function sameSort(a: SortState, b: SortState): boolean {
   return a?.key === b?.key && a?.direction === b?.direction;
 }
 
-/** The controlled prop when given and different from `own`; else `own`, so an equal literal keeps identity. */
-function pick<T>(prop: T | undefined, own: T, same: (a: T, b: T) => boolean): T {
+/**
+ * The controlled prop when given and different from `own`; else `own`, so an equal literal
+ * keeps identity. A prop still equal to `hold` (the value a reset moved away from, not yet
+ * answered by the parent) also shows `own`.
+ */
+function pick<T>(prop: T | undefined, own: T, same: (a: T, b: T) => boolean, hold?: T): T {
   if (prop === undefined || same(prop, own)) return own;
+  if (hold !== undefined && same(prop, hold)) return own;
   return prop;
 }
 
@@ -76,8 +81,8 @@ function pageOnScreen(state: TableState, page: number | undefined): number {
 export function controlledState(state: TableState, props: ViewStateProps): TableState {
   return {
     ...state,
-    search: pick(props.searchValue, state.search, Object.is),
-    filters: pick(props.filters, state.filters, sameFilters),
+    search: pick(props.searchValue, state.search, Object.is, state.proposals.searchHold),
+    filters: pick(props.filters, state.filters, sameFilters, state.proposals.filtersHold),
     sort: pick(props.sort, state.sort, sameSort),
     page: pageOnScreen(state, props.page),
   };

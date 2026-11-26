@@ -1,6 +1,6 @@
 import { type Dispatch, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import type { Column, FilterState, FilterValue } from '../core/types';
-import { defaultFilters as columnDefaults, mergeChanges, NO_PROPOSALS, type TableAction, type TableState, tableReducer, type Transition } from './tableReducer';
+import { defaultFilters as columnDefaults, mergeChanges, NO_PROPOSALS, type Proposals, type TableAction, type TableState, tableReducer, type Transition } from './tableReducer';
 import { useLatest } from './useLatest';
 import { type Answers, classify, recordProposals, settleProposals } from './proposals';
 import { controlledState, reportChanges, sameFilters, type ViewStateProps } from './viewState';
@@ -115,16 +115,29 @@ function syncedState<R>(from: TableState, changes: Changes, options: TableStateO
 }
 
 /**
+ * The controlled props `to` moved away from, to hold on screen until the parent answers:
+ * the page (a reset rule), and the search and filters (a reset). Reported after commit, the
+ * parent's echo arrives a render later; until then the old props must not reach the query.
+ */
+function holdsOf(from: TableState, to: TableState, options: ViewStateProps): Partial<Proposals> {
+  const holds: Partial<Proposals> = {};
+  if (options.page !== undefined && to.page !== from.page) holds.pageHold = options.page;
+  if (options.searchValue !== undefined && to.search !== from.search) holds.searchHold = options.searchValue;
+  if (options.filters !== undefined && !sameFilters(to.filters, from.filters)) holds.filtersHold = options.filters;
+  return holds;
+}
+
+/**
  * The transition of the parent's changes. `from` already holds the parent's values, so only
- * what the table changed itself (page 1, the reset values) is reported. A page moved under a
- * controlled page is held on screen until the page prop changes or the table's next move.
+ * what the table changed itself (page 1, the reset values) is reported. A page, search or
+ * filters value moved under its controlled prop is held on screen until that prop changes or
+ * the table's next move.
  */
 function parentTransition<R>(own: TableState, changes: Changes, options: TableStateOptions<R>): Transition {
   const pageSize = changes.pageSize ? pageSizeOf(options) : own.pageSize;
   const from = { ...controlledState(own, options), pageSize };
   const to = recordProposals(from, syncedState(from, changes, options));
-  if (options.page === undefined || to.page === from.page) return { from, to };
-  return { from, to: { ...to, proposals: { ...to.proposals, pageHold: options.page } } };
+  return { from, to: { ...to, proposals: { ...to.proposals, ...holdsOf(from, to, options) } } };
 }
 
 /**

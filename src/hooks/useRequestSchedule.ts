@@ -9,6 +9,8 @@ export type ScheduleInput = {
   typedKey: string;
   /** Bumped by refresh, reset and retry: a change sends at once, never debounced. */
   generation: number;
+  /** Bumped by a landed "Clear all": the request it asks for is sent at once, never debounced. */
+  landedClears: number;
   delay: number;
   /** Read when the key changes: `false` sends nothing (the request is already answered). */
   needed: boolean;
@@ -16,11 +18,12 @@ export type ScheduleInput = {
   send: (signal: AbortSignal) => void;
 };
 
-type Scheduled = { typedKey: string; generation: number };
+type Scheduled = { typedKey: string; generation: number; landedClears: number };
 
-/** True when only typing changed the request since the last scheduled one (not a refresh, reset or retry). */
+/** True when only typing changed the request since the last scheduled one (not a refresh, reset, retry or clear). */
 function isTyping(last: Scheduled | null, next: Scheduled): boolean {
-  return last !== null && last.typedKey !== next.typedKey && last.generation === next.generation;
+  if (last === null || last.typedKey === next.typedKey) return false;
+  return last.generation === next.generation && last.landedClears === next.landedClears;
 }
 
 /**
@@ -29,11 +32,11 @@ function isTyping(last: Scheduled | null, next: Scheduled): boolean {
  * request, and unmounting, aborts the previous signal and drops a pending timer.
  */
 export function useRequestSchedule(input: ScheduleInput): void {
-  const { requestKey, typedKey, generation } = input;
+  const { requestKey, typedKey, generation, landedClears } = input;
   const latest = useLatest(input);
   const lastScheduled = useRef<Scheduled | null>(null);
   useEffect(() => {
-    const next = { typedKey, generation };
+    const next = { typedKey, generation, landedClears };
     const debounce = isTyping(lastScheduled.current, next);
     lastScheduled.current = next;
     if (!latest.current.needed) return;
@@ -45,5 +48,5 @@ export function useRequestSchedule(input: ScheduleInput): void {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [requestKey, typedKey, generation, latest]);
+  }, [requestKey, typedKey, generation, landedClears, latest]);
 }

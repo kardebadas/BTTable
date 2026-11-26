@@ -22,7 +22,7 @@ function append<T>(list: readonly T[], value: T): readonly T[] {
 
 /**
  * `to` with the search and filters reported since `from` recorded as waiting for their echo.
- * Any reported change also ends a page hold: the table's next move replaces it.
+ * Any reported change also ends the page, search and filters holds: the table's next move replaces them.
  */
 export function recordProposals(from: TableState, to: TableState): TableState {
   if (!reportsChange(from, to)) return to;
@@ -61,11 +61,26 @@ function settle<T>(waiting: readonly T[], answer: Answer, value: T | undefined, 
 /** The parent's answers to the waiting proposals; a new page prop ends the page hold. */
 export type Answers = { search: Answer; searchValue?: string; filters: Answer; filterValue?: FilterState; pageChanged: boolean };
 
+/** A hold kept while the prop still equals it; any other value (or none) ends it. */
+function keepHold<T>(hold: T | undefined, prop: T | undefined, same: Same<T>): T | undefined {
+  return hold !== undefined && prop !== undefined && same(hold, prop) ? hold : undefined;
+}
+
+/** The holds left after the parent's answers: a new page, search or filters prop ends its hold. */
+function settleHolds(proposals: Proposals, answers: Answers): Pick<Proposals, 'pageHold' | 'searchHold' | 'filtersHold'> {
+  return {
+    pageHold: answers.pageChanged ? undefined : proposals.pageHold,
+    searchHold: keepHold(proposals.searchHold, answers.searchValue, Object.is),
+    filtersHold: keepHold(proposals.filtersHold, answers.filterValue, sameFilters),
+  };
+}
+
 /** The proposals still waiting after the parent's answers. */
 export function settleProposals(proposals: Proposals, answers: Answers): Proposals {
   const searches = settle(proposals.searches, answers.search, answers.searchValue, Object.is);
   const filters = settle(proposals.filters, answers.filters, answers.filterValue, sameFilters);
-  const pageHold = answers.pageChanged ? undefined : proposals.pageHold;
-  const same = searches === proposals.searches && filters === proposals.filters && pageHold === proposals.pageHold;
-  return same ? proposals : { pageHold, searches, filters };
+  const holds = settleHolds(proposals, answers);
+  const sameHolds = holds.pageHold === proposals.pageHold && holds.searchHold === proposals.searchHold && holds.filtersHold === proposals.filtersHold;
+  const same = sameHolds && searches === proposals.searches && filters === proposals.filters;
+  return same ? proposals : { ...holds, searches, filters };
 }

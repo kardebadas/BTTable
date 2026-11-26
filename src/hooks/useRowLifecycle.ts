@@ -14,9 +14,13 @@ export type RowLifecycleProps<R> = {
    * Called after a data row mounts (in an effect). With virtualization rows mount and
    * unmount as they enter and leave the mounted window; a re-render of a row with the same
    * id does not call it again. Every call is paired with one `onRowUnmount` (StrictMode included).
+   * Rows already mounted when the callbacks are first set get neither call.
    */
   onRowMount?: RowMount<R>;
-  /** Called when a data row unmounts (the effect cleanup of `onRowMount`). */
+  /**
+   * Called when a data row unmounts (the effect cleanup of `onRowMount`): the latest function,
+   * or the one set at the row's mount if it was removed since.
+   */
   onRowUnmount?: RowUnmount<R>;
 };
 
@@ -29,8 +33,11 @@ export type RowLifecycle<R> = {
   elements: Map<RowId, HTMLTableRowElement>;
   /** Registers a mounted row element; returns its cleanup. */
   track: (id: RowId, element: HTMLTableRowElement) => () => void;
-  /** Calls `onRowMount`; returns the cleanup that calls `onRowUnmount` with the latest row. */
-  mount: (entry: RefObject<RowEntry<R>>, element: HTMLTableRowElement) => () => void;
+  /**
+   * Calls `onRowMount`; returns the cleanup that calls `onRowUnmount` with the latest row, or
+   * nothing when neither callback is set (the row then gets no unmount call either).
+   */
+  mount: (entry: RefObject<RowEntry<R>>, element: HTMLTableRowElement) => (() => void) | undefined;
 };
 
 /** The table's `RowLifecycle`, calling the latest `onRowMount` / `onRowUnmount`. */
@@ -51,8 +58,10 @@ export function useRowLifecycle<R>(props: RowLifecycleProps<R>): RowLifecycle<R>
     };
     const mount = (entry: RefObject<RowEntry<R>>, element: HTMLTableRowElement) => {
       const { row, id } = entry.current;
-      callbacks.current.onRowMount?.(row, element, id);
-      return () => callbacks.current.onRowUnmount?.(entry.current.row, id);
+      const { onRowMount, onRowUnmount } = callbacks.current;
+      if (!onRowMount && !onRowUnmount) return undefined;
+      onRowMount?.(row, element, id);
+      return () => (callbacks.current.onRowUnmount ?? onRowUnmount)?.(entry.current.row, id);
     };
     return { elements, track, mount };
   }, [callbacks]);
