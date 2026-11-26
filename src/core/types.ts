@@ -9,17 +9,27 @@ export type TextOp = 'contains' | 'equals' | 'startsWith' | 'endsWith';
 /** Number filter operators; the default is `eq`. `range` takes `[min, max]`, inclusive. */
 export type NumberOp = 'eq' | 'gt' | 'gte' | 'lt' | 'lte' | 'range';
 
-/** Date filter operators; the default is `on`. Dates compare as calendar days. */
+/**
+ * Date and date-time filter operators; the default is `on`. Dates compare as local calendar
+ * days, date-times as local wall-clock minutes.
+ */
 export type DateOp = 'on' | 'before' | 'after' | 'range';
 
-/** Per-column filter configuration. Dates are ISO `yyyy-mm-dd` strings. */
+/**
+ * Per-column filter configuration. Dates are ISO `yyyy-mm-dd` strings, date-times local
+ * `yyyy-mm-ddThh:mm` strings (the value of `<input type="datetime-local">`).
+ */
 export type FilterSpec =
   | { type: 'text'; op?: TextOp; placeholder?: string; defaultValue?: string }
   | { type: 'number'; op?: NumberOp; defaultValue?: number | [number | null, number | null] }
   | { type: 'date'; op?: DateOp; defaultValue?: string | [string | null, string | null] }
+  | { type: 'datetime'; op?: DateOp; defaultValue?: string | [string | null, string | null] }
   | { type: 'select'; options: Option[]; defaultValue?: string }
   | { type: 'multiselect'; options: Option[]; defaultValue?: string[] }
   | { type: 'notEmpty' };
+
+/** The name of a filter type, as `FilterSpec['type']`. */
+export type FilterType = FilterSpec['type'];
 
 /**
  * The current value of one column filter. Empty values (`''`, `null`, `[]`, an all-null

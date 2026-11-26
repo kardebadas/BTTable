@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { formatMinuteKey, minuteKey } from '../core/dates';
 import type { FilterSpec, FilterValue } from '../core/types';
 import type { BTTableLabels } from '../labels';
 import { MultiSelect, optionText } from './MultiSelect';
+import { blurOnWheel } from './wheel';
 
 /** Props of one filter widget. `id` goes on its first control, which the field label targets. */
 export type FilterWidgetProps<S extends FilterSpec = FilterSpec> = {
@@ -14,6 +16,8 @@ export type FilterWidgetProps<S extends FilterSpec = FilterSpec> = {
   value: FilterValue;
   onChange: (value: FilterValue) => void;
   labels: BTTableLabels;
+  /** Where the multi-select popover is portalled; default `document.body`. */
+  portalContainer?: HTMLElement | null;
 };
 
 type SpecOf<T extends FilterSpec['type']> = Extract<FilterSpec, { type: T }>;
@@ -21,6 +25,12 @@ type SpecOf<T extends FilterSpec['type']> = Extract<FilterSpec, { type: T }>;
 /** Input text of a scalar value; anything else (null, arrays, booleans) is empty. */
 function scalarText(value: unknown): string {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+}
+
+/** Input text of a date-time: any value `minuteKey` reads, as its local `yyyy-mm-ddThh:mm` minute. */
+function minuteText(value: unknown): string {
+  const key = minuteKey(value);
+  return key === null ? scalarText(value) : formatMinuteKey(key);
 }
 
 function parseNumber(text: string): number | null {
@@ -33,9 +43,17 @@ function parseDay(text: string): string | null {
 
 type Parse = (text: string) => number | string | null;
 
+/** The native input type of each keyed filter. */
+const INPUT_TYPE = { number: 'number', date: 'date', datetime: 'datetime-local' } as const;
+
+type InputType = (typeof INPUT_TYPE)[keyof typeof INPUT_TYPE];
+
+/** The input text of a stored value, per input type. */
+const TO_TEXT: Record<InputType, (value: unknown) => string> = { number: scalarText, date: scalarText, 'datetime-local': minuteText };
+
 type KeyInputProps = {
   id?: string;
-  type: 'number' | 'date';
+  type: InputType;
   ariaLabel?: string;
   /** The stored filter value of this input. */
   value: unknown;
@@ -44,12 +62,13 @@ type KeyInputProps = {
 };
 
 /**
- * A number or date input that keeps the text as typed (`1.0`, `-0.`), commits its parsed
+ * A number, date or datetime-local input that keeps the text as typed (`1.0`, `-0.`), commits its parsed
  * value on each change, and takes the stored value again only when that differs from the
- * parsed text, as after an outside reset.
+ * parsed text, as after an outside reset. A stored date-time shows as its local minute, so a
+ * `Date`, a zoned or a seconds-precise string still fills the datetime-local input.
  */
 function KeyInput({ id, type, ariaLabel, value, parse, onCommit }: KeyInputProps) {
-  const stored = scalarText(value);
+  const stored = TO_TEXT[type](value);
   const [draft, setDraft] = useState(stored);
   // Compares parsed forms, so a stored value of the wrong shape settles after one resync;
   // `===` keeps "-0" (stored as -0, printed "0"), `Object.is` keeps NaN from looping.
@@ -68,11 +87,12 @@ function KeyInput({ id, type, ariaLabel, value, parse, onCommit }: KeyInputProps
       aria-label={ariaLabel}
       value={draft}
       onChange={(event) => change(event.target.value)}
+      onWheel={type === 'number' ? blurOnWheel : undefined}
     />
   );
 }
 
-type RangeProps = FilterWidgetProps & { type: 'number' | 'date'; parse: Parse };
+type RangeProps = FilterWidgetProps & { type: InputType; parse: Parse };
 
 /** Two inputs for an inclusive `[from, to]` range; editing one end keeps the other. */
 function RangeInputs({ id, name, value, onChange, labels, type, parse }: RangeProps) {
@@ -90,12 +110,13 @@ function RangeInputs({ id, name, value, onChange, labels, type, parse }: RangePr
   );
 }
 
-/** `number` and `date` filters: one native input, or two for `op: 'range'`. */
-function KeyFilter(props: FilterWidgetProps<SpecOf<'number' | 'date'>>) {
+/** `number`, `date` and `datetime` filters: one native input, or two for `op: 'range'`. */
+function KeyFilter(props: FilterWidgetProps<SpecOf<'number' | 'date' | 'datetime'>>) {
   const { id, spec, value, onChange } = props;
   const parse = spec.type === 'number' ? parseNumber : parseDay;
-  if (spec.op === 'range') return <RangeInputs {...props} type={spec.type} parse={parse} />;
-  return <KeyInput id={id} type={spec.type} value={value} parse={parse} onCommit={onChange} />;
+  const type = INPUT_TYPE[spec.type];
+  if (spec.op === 'range') return <RangeInputs {...props} type={type} parse={parse} />;
+  return <KeyInput id={id} type={type} value={value} parse={parse} onCommit={onChange} />;
 }
 
 function SelectFilter({ id, spec, value, onChange, labels }: FilterWidgetProps<SpecOf<'select'>>) {
@@ -137,12 +158,14 @@ export function FilterWidget(props: FilterWidgetProps) {
       );
     case 'number':
     case 'date':
+    case 'datetime':
       return <KeyFilter {...props} spec={spec} />;
     case 'select':
       return <SelectFilter {...props} spec={spec} />;
     case 'multiselect': {
       const chosen = Array.isArray(value) ? (value as readonly string[]) : [];
-      return <MultiSelect id={id} labelledBy={props.labelId} options={spec.options} value={chosen} onChange={onChange} labels={props.labels} />;
+      const { labelId, labels, portalContainer } = props;
+      return <MultiSelect id={id} labelledBy={labelId} options={spec.options} value={chosen} onChange={onChange} labels={labels} portalContainer={portalContainer} />;
     }
     case 'notEmpty':
       return <NotEmptyFilter {...props} />;

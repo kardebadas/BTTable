@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useId, useState } from 'react';
 import { clampPage } from '../core/pagination';
 import { type BTTableLabels, fillLabel, formatCount } from '../labels';
+import { blurOnWheel } from './wheel';
 
 /** Props of `Pagination`. Pages are 1-based. */
 export type PaginationProps = {
@@ -17,7 +18,7 @@ export type PaginationProps = {
 
 type PageInputProps = Pick<PaginationProps, 'labels' | 'locale' | 'page' | 'pageCount' | 'onPageChange'>;
 
-/** Page number box: edits stay local until Enter or blur, then commit clamped into range. */
+/** Page number box: edits stay local until Enter or blur, then commit clamped into range; a wheel turn blurs it. */
 function PageInput({ labels, locale, page, pageCount, onPageChange }: PageInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
@@ -45,6 +46,7 @@ function PageInput({ labels, locale, page, pageCount, onPageChange }: PageInputP
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={onKeyDown}
+        onWheel={blurOnWheel}
       />
       <span className="btt-page-count">{fillLabel(labels.pageOf, { count: formatCount(pageCount, locale) })}</span>
     </span>

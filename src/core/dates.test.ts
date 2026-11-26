@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayKey, formatIsoDay, formatUsDate, parseDate } from './dates';
+import { dayKey, formatIsoDay, formatUsDate, parseDate, formatMinuteKey, minuteKey } from './dates';
 
 function parts(date: Date | null): number[] | null {
   if (!date) return null;
@@ -110,5 +110,39 @@ describe('date formatting helpers', () => {
   it('gives one ordered key per calendar day, ignoring the time', () => {
     expect(dayKey(date)).toBe(dayKey(new Date(2026, 0, 5)));
     expect(dayKey(new Date(2025, 11, 31))).toBeLessThan(dayKey(new Date(2026, 0, 1)));
+  });
+});
+
+describe('minuteKey and formatMinuteKey', () => {
+  it('keys the local wall-clock minute, dropping seconds', () => {
+    expect(minuteKey('2026-01-05T09:07')).toBe(202601050907);
+    expect(minuteKey('2026-01-05T09:07:59.999')).toBe(202601050907);
+    expect(minuteKey('1/5/2026 9:07 PM')).toBe(202601052107);
+    expect(minuteKey(new Date(2026, 0, 5, 9, 7, 30))).toBe(202601050907);
+  });
+
+  it('reads zoned strings and Dates on the local (New York) clock', () => {
+    expect(minuteKey('2026-01-06T03:15:00Z')).toBe(202601052215);
+    expect(minuteKey(new Date(Date.UTC(2026, 6, 1, 12, 0)))).toBe(202607010800);
+  });
+
+  it('is null for anything that is not a date', () => {
+    for (const value of [null, undefined, '', '  ', 'soon', '2026-02-30T10:00', '2026-01-05T24:00', 42, new Date(Number.NaN)]) {
+      expect(minuteKey(value)).toBeNull();
+    }
+  });
+
+  it('keeps zoneless clock times a DST change skips or repeats as written', () => {
+    // 2026-03-08 02:30 does not exist in New York, 2026-11-01 01:30 happens twice.
+    expect(minuteKey('2026-03-08T02:30')).toBe(202603080230);
+    expect(minuteKey('2026-11-01T01:30')).toBe(202611010130);
+    expect(minuteKey('2026-11-01T05:30:00Z')).toBe(202611010130);
+    expect(minuteKey('2026-11-01T06:30:00Z')).toBe(202611010130);
+  });
+
+  it('orders keys by time and formats them as datetime-local strings', () => {
+    expect(minuteKey('2026-01-05T23:59')).toBeLessThan(minuteKey('2026-01-06T00:00') as number);
+    expect(formatMinuteKey(202601050907)).toBe('2026-01-05T09:07');
+    expect(formatMinuteKey(minuteKey('0999-12-31T23:59') as number)).toBe('0999-12-31T23:59');
   });
 });

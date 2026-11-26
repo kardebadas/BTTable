@@ -252,13 +252,14 @@ or the load error has the class `btt-empty-row` instead.
 | --- | --- | --- |
 | `search` | `true` | Show the global search box (with a clear button). |
 | `searchPlaceholder` | `'Search…'` | Placeholder of the search box. |
-| `searchDebounceMs` | `250` | Quiet time before typed search applies. In server mode it also delays typed `text`, `number` and `date` filters. |
+| `searchDebounceMs` | `250` | Quiet time before typed search applies. In server mode it also delays typed `text`, `number`, `date` and `datetime` filters. |
 | `showCounter` | `true` | "Showing 1–100 of 2,345", plus "(filtered from 50,000)" when filtering hid rows, or "No records". In server and manual mode a small "?" button next to it explains that search and filters run on the whole dataset and one page shows (the `counterHelp` label, in a tooltip on hover or focus; Escape closes it). |
 | `clearAll` | `true` | A "Clear all" button, shown while the search box holds text or any filter is active: it empties both at once (no debounce; server and manual mode send the cleared query at once) and returns to page 1, reported through `onSearchChange`, `onFiltersChange` and `onPageChange`. Filters go to empty, not to their defaults (that is `resetKey`). `false` hides it. The search box's own × clears the search only. |
 | `pagination` | `true` | Client mode: `false` shows every filtered row in one scroll (virtualized). Server mode always paginates; `false` is ignored with a development warning. |
 | `pageSize` | `100` | Initial page size. Changing the prop resyncs the table. |
 | `pageSizeOptions` | `[25, 50, 100, 500]` | Choices of the page-size select; positive whole numbers only. The current size is added when missing. |
 | `toolbarExtras` | – | Your own content (buttons, badges) placed at the end of the toolbar. |
+| `portalContainer` | `document.body` | Where `multiselect` filter popovers are portalled. The popover is `position: fixed` at its button, so an `overflow: hidden` ancestor never clips it; it follows the button on any scroll or resize, opens above it when there is no room below, and copies the table's theme (the computed `--btt-*` values and the `btt-theme-*` class), so it looks the same wherever it lands. Pass an element inside a focus-trapping modal so the popover stays inside the trap. The container must not sit inside an element with `transform`, `filter`, `perspective` or `contain` set: such an ancestor becomes the containing block of `position: fixed`, and the popover lands offset from its button. Events from the popover still bubble through the React tree (to the table's ancestors' React handlers), as with any React portal; Escape and Tab inside it are consumed. |
 | `resetKey` | – | Change it to put search and filters back to their defaults (`defaultSearchValue`, `defaultFilters` over the columns' `defaultValue`) and return to page 1. Sort and page size stay. The changes go to the callbacks below. |
 
 ### View state (controlled or uncontrolled)
@@ -341,6 +342,7 @@ table. Widgets are native inputs, except `multiselect`, which is a package-owned
 | `text` | text input | `string` | `op`: `'contains'` (default), `'equals'`, `'startsWith'`, `'endsWith'`; `placeholder`; `defaultValue` |
 | `number` | number input, two for `range` | `number`, or `[min, max]` (each `number \| null`) for `range` | `op`: `'eq'` (default), `'gt'`, `'gte'`, `'lt'`, `'lte'`, `'range'`; `defaultValue` |
 | `date` | date input, two for `range` | ISO day `'yyyy-mm-dd'`, or `[from, to]` (each `string \| null`) for `range` | `op`: `'on'` (default), `'before'`, `'after'`, `'range'`; `defaultValue` |
+| `datetime` | `datetime-local` input, two for `range` | local minute `'yyyy-mm-ddThh:mm'`, or `[from, to]` (each `string \| null`) for `range` | `op`: `'on'` (default), `'before'`, `'after'`, `'range'`; `defaultValue` (any form a row value may take, e.g. `'2026-01-05T14:07:45Z'`; the input shows it as the local minute) |
 | `select` | `<select>` with an "All" choice | option `value` (`string`) | `options` (required); `defaultValue` |
 | `multiselect` | button showing the choice as chips, opening checkboxes with a search box | `string[]` of option values | `options` (required); `defaultValue` |
 | `notEmpty` | checkbox "Only non-empty" | `boolean` | – |
@@ -351,13 +353,19 @@ type Option = { value: string; label: ReactNode };
 
 How client mode matches (against the column's `value`, default `row[key]`):
 
-- An empty filter is inactive: `''`, blank text, an unparsable number or date, an all-empty
+- An empty filter is inactive: `''`, blank text, an unparsable number, date or date-time, an all-empty
   range, `[]`, or `false` for `notEmpty`. `0` is a real value.
 - `text` compares the cell's display text, trimmed and case-insensitive.
 - `number` compares numerically; numeric strings in rows (`'12.5'`) count as numbers.
   Ranges are inclusive and either end may be open.
 - `date` compares calendar days. Row values may be `Date` objects, ISO strings
   (`yyyy-mm-dd`, optionally with a time) or US strings (`M/D/YYYY`, optionally with a time).
+- `datetime` compares local wall-clock minutes (seconds are ignored): `on` is the same
+  minute, `before` / `after` are strict, `range` is inclusive with optional ends. Row values
+  take the same forms as for `date`; a value with a zone (`…Z`, `+02:00`) or a `Date` is read
+  on the browser's clock. Daylight saving: a zoneless string compares as written, so a
+  clock time the change skips matches only rows written with that time, and in the repeated
+  hour `on 01:30` matches both 01:30s.
 - `select` matches the option value exactly against `String(value)`, or against any element
   when the value is an array; `multiselect` matches when any chosen option matches.
 - `notEmpty` keeps rows whose value is not `null`, `undefined`, blank text or `[]`.
@@ -365,6 +373,10 @@ How client mode matches (against the column's `value`, default `row[key]`):
 `defaultValue`s (and the `defaultFilters` prop over them) apply once at mount and again on
 `resetKey`. Changing the identity of
 `columns` does not clear active filters. A filter change returns to page 1.
+
+Number inputs (filters and the page box) blur when the mouse wheel turns over them while
+they have focus, so scrolling the page never changes a value; the scroll itself is never
+blocked.
 
 ## Search and sorting
 
@@ -458,16 +470,17 @@ Example query:
 ```
 
 - `filters` holds only **active** filters, keyed by column key, with typed values: text
-  trimmed, numbers as numbers, dates as ISO `yyyy-mm-dd` days, `select` a string,
+  trimmed, numbers as numbers, dates as ISO `yyyy-mm-dd` days, date-times as local
+  `yyyy-mm-ddThh:mm` minutes (no zone: the browser's clock, as typed), `select` a string,
   `multiselect` a string array, `notEmpty` `true`.
-- `op` is always present for `text`, `number` and `date` filters: the column's `op`, else
-  the default (`contains`, `eq`, `on`). `select`, `multiselect` and `notEmpty` have none.
+- `op` is always present for `text`, `number`, `date` and `datetime` filters: the column's
+  `op`, else the default (`contains`, `eq`, `on`, `on`). `select`, `multiselect` and `notEmpty` have none.
 - `totalRows` is the unfiltered count; `totalFilteredRows` (default `totalRows`) is the count
   after search and filters and drives the counter and the page count.
 
 Behaviour:
 
-- **Debounce.** Typing in the search box or in a `text`, `number` or `date` filter waits for
+- **Debounce.** Typing in the search box or in a `text`, `number`, `date` or `datetime` filter waits for
   `searchDebounceMs` of quiet. Page, page size, sort, `select`, `multiselect` and `notEmpty`
   changes are sent at once.
 - **Cancellation.** A new request aborts the one in flight through `signal`, and a response
@@ -766,7 +779,8 @@ plain rule wins:
 
 **Dark mode** follows `prefers-color-scheme: dark` by redefining the same variables. To force
 one scheme regardless of the system, add `btt-theme-light` or `btt-theme-dark` to
-`className`. Animations (the loading spinner, hover fades) run only when the user has not
+`className`. The `multiselect` popover, portalled out of the table, copies the table's
+computed `--btt-*` values and theme class, so your variables apply to it too. Animations (the loading spinner, hover fades) run only when the user has not
 asked for reduced motion.
 
 Row striping, hover, row tones, the selected-row tint and the cell grid lines have zero specificity
@@ -796,7 +810,9 @@ Do not give `th`/`td` widths of your own: column widths come from `columns` only
   selected"), and the chips are hidden from assistive technology. It opens a search box and
   a `listbox`: ArrowDown on the button opens it and focuses the search box, ArrowDown there
   enters the list, arrows move, Space or Enter toggles, Escape closes and returns focus, a
-  click outside closes it.
+  click outside closes it. The popover is portalled (`portalContainer`) but keeps the Tab
+  order of an in-place one: Shift+Tab from the search box returns to the button, Tab from
+  the list closes it and moves on to whatever follows the button.
 - `caption` adds a visually hidden table caption.
 - Errors are announced with `role="alert"`.
 
@@ -823,13 +839,26 @@ error tints (without them, no tint).
 
 Besides `BTTable` and its types (`BTTableProps`, `BTTableClientProps`, `BTTableServerProps`,
 `BTTableCommonProps`, `SelectionBarContext`, `Column`, `CellContext`, `FilterSpec`,
-`FilterState`, `FilterValue`, `Option`, `TextOp`, `NumberOp`, `DateOp`, `SortState`, `Query`,
+`FilterState`, `FilterValue`, `FilterType`, `FilterRowsInput`, `QueryState`, `Option`, `TextOp`, `NumberOp`, `DateOp`, `SortState`, `Query`,
 `FetchResult`, `FetchRows`, `ExportData`, `RowId`, `RowSource`, `CellHandler`, `RowAttributes`, `ClientTableState`,
 `BTTableHandle`, `RowAlign`, `RowTone`, `RowMount`, `RowUnmount`,
 `BTTableLabels`, `VirtualizeMode`), the package exports `DEFAULT_LABELS` and the helpers it
 uses itself:
 
 - `compareValues(a, b, direction?)` — the sort comparator.
+- `filterRows({ rows, columns, search, filters })` — the rows client mode shows before
+  sorting: search and every active filter, in input order.
+- `matchesFilter(spec, rowValue, value)` and `isFilterActive(spec, value)` — one column
+  filter, as client mode applies it; an inactive filter matches every row.
+- `matchesSearch(row, columns, term)` — the global search of one row.
+- `buildQuery({ search, filters, sort, page, pageSize }, columns)` — the `Query` server and
+  manual mode send for a view state.
+- `normalizeFilterType(input)` — a loose filter type name → `FilterType | null`: trimmed,
+  lowercased, legacy spellings mapped (`multi_select` / `multi-select` → `multiselect`,
+  `textarea` / `string` → `text`, `numeric` → `number`, `not_empty` → `notEmpty`, and the
+  legacy `dataType_filterType` pairs such as `date_text` → `date`, `datetime_text` →
+  `datetime`, `string_select` → `select`); `null` for anything unknown, blank or not a
+  string, never a silent `text`.
 - `parseDate(value)` — `Date`, ISO or US date string → `Date | null`, with calendar
   validation.
 - `formatValue(value)` — the default cell text.

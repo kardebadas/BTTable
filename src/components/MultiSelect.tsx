@@ -1,7 +1,10 @@
-import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Option } from '../core/types';
 import { type BTTableLabels, fillLabel } from '../labels';
 import { cx } from './classNames';
+import { focusNextAfter } from './focusOrder';
+import { usePortalPosition } from './popoverPosition';
 
 /** Props of `MultiSelect`. */
 export type MultiSelectProps = {
@@ -14,6 +17,8 @@ export type MultiSelectProps = {
   value: readonly string[];
   onChange: (value: string[]) => void;
   labels: BTTableLabels;
+  /** Where the popover is portalled; default `document.body`. */
+  portalContainer?: HTMLElement | null;
 };
 
 /** Plain text of an option: a string or number label, else its value. Used by native `<option>`s and the search box. */
@@ -58,27 +63,45 @@ function toggleValue(value: readonly string[], item: string): string[] {
   return value.includes(item) ? value.filter((other) => other !== item) : [...value, item];
 }
 
-/** Closes the popover on a mouse press outside `root` while it is open. */
-function useOutsideClose(root: RefObject<HTMLDivElement | null>, open: boolean, close: () => void): void {
-  useEffect(() => {
-    if (!open) return;
-    const onPress = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) close();
-    };
-    document.addEventListener('mousedown', onPress);
-    return () => document.removeEventListener('mousedown', onPress);
-  }, [root, open, close]);
-}
-
 type MultiSelectRefs = {
   rootRef: RefObject<HTMLDivElement | null>;
+  popoverRef: RefObject<HTMLDivElement | null>;
   buttonRef: RefObject<HTMLButtonElement | null>;
   searchRef: RefObject<HTMLInputElement | null>;
   listRef: RefObject<HTMLUListElement | null>;
 };
 
+/** The element refs of one `MultiSelect`, as one stable object. */
+function useControlRefs(): MultiSelectRefs {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  return useMemo(() => ({ rootRef, popoverRef, buttonRef, searchRef, listRef }), []);
+}
+
+/** Whether `node` is inside the control: its button root or its portalled popover. */
+function isInside({ rootRef, popoverRef }: MultiSelectRefs, node: Node | null): boolean {
+  if (!node) return false;
+  return Boolean(rootRef.current?.contains(node) || popoverRef.current?.contains(node));
+}
+
+/** Closes the popover on a mouse press outside the control (the portalled popover counts as inside) while it is open. */
+function useOutsideClose(refs: MultiSelectRefs, open: boolean, close: () => void): void {
+  useEffect(() => {
+    if (!open) return;
+    const onPress = (event: MouseEvent) => {
+      if (!isInside(refs, event.target as Node)) close();
+    };
+    document.addEventListener('mousedown', onPress);
+    return () => document.removeEventListener('mousedown', onPress);
+  }, [refs, open, close]);
+}
+
 /** Open state, search text, active option, focus moves and toggles of one `MultiSelect`. */
-function useMultiSelect(props: MultiSelectProps, { rootRef, buttonRef, searchRef, listRef }: MultiSelectRefs) {
+function useMultiSelect(props: MultiSelectProps, refs: MultiSelectRefs) {
+  const { buttonRef, searchRef, listRef } = refs;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -91,7 +114,7 @@ function useMultiSelect(props: MultiSelectProps, { rootRef, buttonRef, searchRef
     },
     [buttonRef],
   );
-  useOutsideClose(rootRef, open, close);
+  useOutsideClose(refs, open, close);
   useEffect(() => {
     if (open) searchRef.current?.focus();
   }, [open, searchRef]);
@@ -102,6 +125,8 @@ function useMultiSelect(props: MultiSelectProps, { rootRef, buttonRef, searchRef
   }, [open, active, listRef]);
   const needle = query.trim().toLowerCase();
   const visible = props.options.filter((option) => optionText(option).toLowerCase().includes(needle));
+  // The visible count drives the list height, so a change re-places the popover.
+  usePortalPosition({ open, anchorRef: buttonRef, popoverRef: refs.popoverRef, layoutKey: visible.length });
   const toggle = (item: string) => props.onChange(toggleValue(props.value, item));
   const search = (text: string) => {
     setQuery(text);
@@ -153,6 +178,21 @@ function onListKey(event: KeyboardEvent, ctl: Controller): void {
   event.preventDefault();
 }
 
+/**
+ * Tab inside the portalled popover, which sits away from its button in the document, keeps
+ * the order of an in-place popover: Shift+Tab from the search box closes it onto the
+ * button, Tab from the list closes it and moves on to whatever follows the button.
+ */
+function onPopoverTab(event: KeyboardEvent, ctl: Controller, refs: MultiSelectRefs): void {
+  if (event.key !== 'Tab') return;
+  const fromSearch = event.target === refs.searchRef.current;
+  if (event.shiftKey !== fromSearch) return;
+  event.preventDefault();
+  ctl.close(true);
+  const button = refs.buttonRef.current;
+  if (!event.shiftKey && button) focusNextAfter(button, refs.popoverRef.current);
+}
+
 type OptionItemProps = { id: string; option: Option; selected: boolean; active: boolean; onPick: () => void };
 
 /** One listbox option; a press keeps focus where it is, so the list stays open and keyboard-driven. */
@@ -174,14 +214,14 @@ function OptionItem({ id, option, selected, active, onPick }: OptionItemProps) {
 
 type PopoverProps = {
   ctl: Controller;
+  refs: MultiSelectRefs;
   listId: string;
   props: MultiSelectProps;
-  searchRef: RefObject<HTMLInputElement | null>;
-  listRef: RefObject<HTMLUListElement | null>;
 };
 
 /** The listbox of the visible options, driven by `aria-activedescendant` while it has focus. */
-function OptionList({ ctl, listId, props, listRef }: Omit<PopoverProps, 'searchRef'>) {
+function OptionList({ ctl, listId, props, refs }: PopoverProps) {
+  const { listRef } = refs;
   const { visible, active } = ctl;
   const optionId = (index: number) => `${listId}-option-${index}`;
   return (
@@ -213,10 +253,15 @@ function OptionList({ ctl, listId, props, listRef }: Omit<PopoverProps, 'searchR
   );
 }
 
+/**
+ * The popover body: a search box, the option list and the "no options" note. Tab is
+ * handled here so the portalled popover keeps an in-place Tab order.
+ */
 function Popover(popover: PopoverProps) {
-  const { ctl, listId, props, searchRef } = popover;
+  const { ctl, listId, props, refs } = popover;
+  const { searchRef, popoverRef } = refs;
   return (
-    <div className="btt-multiselect-popover">
+    <div ref={popoverRef} className="btt-multiselect-popover" onKeyDown={(event) => onPopoverTab(event, ctl, refs)}>
       <input
         ref={searchRef}
         type="text"
@@ -233,6 +278,11 @@ function Popover(popover: PopoverProps) {
   );
 }
 
+/** The popover in its portal: `portalContainer`, else `document.body`. Rendered only while open, so never on the server. */
+function PortalPopover(popover: PopoverProps) {
+  return createPortal(<Popover {...popover} />, popover.props.portalContainer ?? document.body);
+}
+
 /**
  * Package-owned multi-choice dropdown: a button showing the choice as chips (up to two
  * labels, then "+N"; "All" when empty), named by its label plus a hidden summary ("All",
@@ -240,14 +290,14 @@ function Popover(popover: PopoverProps) {
  * checkbox options. Keyboard: ArrowDown on the button opens it and focuses the search box,
  * ArrowDown there enters the list, arrows move, Space or Enter toggles, Escape closes and
  * returns focus to the button. A press outside or focus leaving closes it. Fully
- * controlled by `value`.
+ * controlled by `value`. The popover is portalled (`portalContainer`, default
+ * `document.body`) and fixed at the button, so `overflow: hidden` ancestors never clip it;
+ * it carries the table's theme and counts as inside for focus and outside presses.
  */
 export function MultiSelect(props: MultiSelectProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
-  const ctl = useMultiSelect(props, { rootRef, buttonRef, searchRef, listRef });
+  const refs = useControlRefs();
+  const { rootRef, buttonRef } = refs;
+  const ctl = useMultiSelect(props, refs);
   const listId = `${props.id}-listbox`;
   const summaryId = `${props.id}-summary`;
   const onButtonKey = (event: KeyboardEvent) => {
@@ -257,7 +307,7 @@ export function MultiSelect(props: MultiSelectProps) {
   };
   const onBlur = (event: FocusEvent) => {
     const next = event.relatedTarget;
-    if (next && !event.currentTarget.contains(next)) ctl.close();
+    if (next && !isInside(refs, next)) ctl.close();
   };
   return (
     <div ref={rootRef} className="btt-multiselect" onBlur={onBlur}>
@@ -278,7 +328,7 @@ export function MultiSelect(props: MultiSelectProps) {
         </span>
         <Chips {...props} />
       </button>
-      {ctl.open && <Popover ctl={ctl} listId={listId} props={props} searchRef={searchRef} listRef={listRef} />}
+      {ctl.open && <PortalPopover ctl={ctl} refs={refs} listId={listId} props={props} />}
     </div>
   );
 }

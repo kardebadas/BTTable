@@ -286,13 +286,16 @@
   transform: rotate(-135deg);
 }
 
+/* Portalled to document.body (or portalContainer), so it restates the root font and colors. */
 .btt-multiselect-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  left: 0;
-  z-index: 10;
+  position: fixed;
+  z-index: 9999;
   display: flex;
+  max-width: calc(100vw - 16px);
+  font-family: var(--btt-font);
+  font-size: var(--btt-font-size);
+  line-height: 1.45;
+  color: var(--btt-fg);
   flex-direction: column;
   gap: 6px;
   padding: 6px;
@@ -300,6 +303,21 @@
   border: 1px solid var(--btt-border-strong);
   border-radius: var(--btt-radius);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.btt-multiselect-popover *,
+.btt-multiselect-popover *::before,
+.btt-multiselect-popover *::after {
+  box-sizing: border-box;
+}
+
+.btt-multiselect-popover :focus-visible {
+  outline: 2px solid var(--btt-accent);
+  outline-offset: 1px;
+}
+
+.btt-multiselect-popover input[type='checkbox'] {
+  accent-color: var(--btt-accent);
 }
 
 .btt-multiselect-search {

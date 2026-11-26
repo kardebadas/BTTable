@@ -9,7 +9,8 @@
  * from the table's <colgroup> only.
  */
 
-:where(.btt) {
+/* The light defaults also sit on a portalled popover; it gets its table's computed values inline. */
+:where(.btt, .btt-multiselect-popover) {
   --btt-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --btt-font-size: 0.875rem;
   --btt-bg: #ffffff;

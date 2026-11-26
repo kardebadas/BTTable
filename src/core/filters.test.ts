@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { filterRows, isFilterActive, matchesFilter } from './filters';
+import { filterRows, isFilterActive, matchesFilter, normalizeFilterType } from './filters';
 import type { Column, FilterSpec, FilterValue } from './types';
 
 const text = (op?: 'contains' | 'equals' | 'startsWith' | 'endsWith'): FilterSpec => ({ type: 'text', op });
@@ -160,5 +160,90 @@ describe('filterRows', () => {
     expect(result).toHaveLength(13333);
     expect(result[0]).toBe(rows[1]);
     expect(value).toHaveBeenCalledTimes(many.length);
+  });
+});
+
+describe('datetime filters', () => {
+  const dt = (op?: 'on' | 'before' | 'after' | 'range'): FilterSpec => ({ type: 'datetime', op });
+  const rows = ['2026-01-05T09:06:59', '2026-01-05T09:07:00', '2026-01-05T09:07:45', '2026-01-05T14:08:00Z', '1/5/2026 9:08 AM', null, 'n/a'];
+
+  it('is active only for a valid date-time, or a range with one valid end', () => {
+    expect(isFilterActive(dt(), '2026-01-05T09:07')).toBe(true);
+    for (const value of ['', null, undefined, 'tomorrow', '2026-13-01T00:00']) expect(isFilterActive(dt(), value)).toBe(false);
+    expect(isFilterActive(dt('range'), [null, '2026-01-05T09:07'])).toBe(true);
+    expect(isFilterActive(dt('range'), ['', 'bad'])).toBe(false);
+    expect(isFilterActive(dt('range'), '2026-01-05T09:07')).toBe(false);
+  });
+
+  it('matches the same local minute for on (the default), whatever the seconds or row format', () => {
+    expect(matches(dt(), rows, '2026-01-05T09:07')).toEqual(['2026-01-05T09:07:00', '2026-01-05T09:07:45']);
+    expect(matches(dt(), rows, '2026-01-05T09:08')).toEqual(['2026-01-05T14:08:00Z', '1/5/2026 9:08 AM']);
+  });
+
+  it('compares minutes strictly for before and after, inclusively for a range', () => {
+    expect(matches(dt('before'), rows, '2026-01-05T09:07')).toEqual(['2026-01-05T09:06:59']);
+    expect(matches(dt('after'), rows, '2026-01-05T09:07')).toEqual(['2026-01-05T14:08:00Z', '1/5/2026 9:08 AM']);
+    expect(matches(dt('range'), rows, ['2026-01-05T09:07', '2026-01-05T09:07'])).toEqual(['2026-01-05T09:07:00', '2026-01-05T09:07:45']);
+    expect(matches(dt('range'), rows, ['2026-01-05T09:08', null])).toEqual(['2026-01-05T14:08:00Z', '1/5/2026 9:08 AM']);
+  });
+
+  it('matches every row while the value is empty or invalid', () => {
+    expect(matches(dt(), rows, 'not a date')).toEqual(rows);
+  });
+
+  it('compares DST-skipped and repeated clock times as written', () => {
+    const fallBack = ['2026-11-01T05:30:00Z', '2026-11-01T06:30:00Z', '2026-11-01T01:31'];
+    expect(matches(dt(), fallBack, '2026-11-01T01:30')).toEqual(['2026-11-01T05:30:00Z', '2026-11-01T06:30:00Z']);
+    expect(matches(dt(), ['2026-03-08T02:30', '2026-03-08T03:30'], '2026-03-08T02:30')).toEqual(['2026-03-08T02:30']);
+  });
+
+  it('narrows filterRows, dates as calendar days next to date-times as minutes', () => {
+    type Row = { at: string };
+    const columns: Column<Row>[] = [
+      { key: 'at', header: 'At', filter: dt('after') },
+      { key: 'day', header: 'Day', value: (row) => row.at, filter: date() },
+    ];
+    const data = [{ at: '2026-01-05T09:00' }, { at: '2026-01-05T18:00' }, { at: '2026-01-06T10:00' }];
+    const filters = { at: '2026-01-05T12:00', day: '2026-01-05' };
+    expect(filterRows({ rows: data, columns, search: '', filters })).toEqual([{ at: '2026-01-05T18:00' }]);
+  });
+});
+
+describe('normalizeFilterType', () => {
+  it('trims and lowercases the v1 names', () => {
+    expect(normalizeFilterType(' Text ')).toBe('text');
+    expect(normalizeFilterType('NUMBER')).toBe('number');
+    expect(normalizeFilterType('date')).toBe('date');
+    expect(normalizeFilterType('DateTime')).toBe('datetime');
+    expect(normalizeFilterType('select')).toBe('select');
+    expect(normalizeFilterType('multiSelect')).toBe('multiselect');
+    expect(normalizeFilterType('notEmpty')).toBe('notEmpty');
+  });
+
+  it('maps legacy spellings and dataType_filterType pairs', () => {
+    const cases: [string, string][] = [
+      ['multi_select', 'multiselect'],
+      ['multi-select', 'multiselect'],
+      ['string_multiselect', 'multiselect'],
+      ['textarea', 'text'],
+      ['string', 'text'],
+      ['string_text', 'text'],
+      ['numeric', 'number'],
+      ['number_text', 'number'],
+      ['date_text', 'date'],
+      ['datetime_text', 'datetime'],
+      ['date_time', 'datetime'],
+      ['datetime-local', 'datetime'],
+      ['string_select', 'select'],
+      ['not_empty', 'notEmpty'],
+      ['not-empty', 'notEmpty'],
+    ];
+    for (const [input, type] of cases) expect(normalizeFilterType(input)).toBe(type);
+  });
+
+  it('returns null for unknown, blank and non-string input instead of guessing text', () => {
+    for (const input of ['checkbox', '', '   ', '__proto__', 'constructor', null, undefined, 3, ['text'], { type: 'text' }]) {
+      expect(normalizeFilterType(input)).toBeNull();
+    }
   });
 });

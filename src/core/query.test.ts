@@ -83,3 +83,30 @@ describe('typedFiltersKey', () => {
     expect(typedFiltersKey({ ...query, filters: { ...query.filters, name: { type: 'text', value: 'ab' } } })).not.toBe(typed);
   });
 });
+
+describe('buildQuery datetime filters', () => {
+  const columns: Column<Row>[] = [
+    { key: 'at', header: 'At', filter: { type: 'datetime' } },
+    { key: 'window', header: 'Window', filter: { type: 'datetime', op: 'range' } },
+    { key: 'late', header: 'Late', filter: { type: 'datetime', op: 'after' } },
+  ];
+
+  it('sends local yyyy-mm-ddThh:mm minutes with the operator, on by default', () => {
+    const filters: FilterState = { at: '2026-01-05T09:07:45', window: [null, '2026-01-06T03:15:00Z'] as const, late: '2026-07-01T12:05:00Z' };
+    expect(buildQuery({ ...BASE, filters }, columns).filters).toEqual({
+      at: { type: 'datetime', op: 'on', value: '2026-01-05T09:07' },
+      window: { type: 'datetime', op: 'range', value: [null, '2026-01-05T22:15'] },
+      late: { type: 'datetime', op: 'after', value: '2026-07-01T08:05' },
+    });
+  });
+
+  it('drops empty and invalid date-times and keeps DST clock times as typed', () => {
+    const filters = { at: 'nope', window: ['', 'bad'], late: '2026-03-08T02:30' };
+    expect(buildQuery({ ...BASE, filters }, columns).filters).toEqual({ late: { type: 'datetime', op: 'after', value: '2026-03-08T02:30' } });
+  });
+
+  it('debounces datetime edits like the other typed-in filters', () => {
+    const query = buildQuery({ ...BASE, filters: { at: '2026-01-05T09:07' } }, columns);
+    expect(typedFiltersKey({ ...query, filters: { at: { type: 'datetime', value: '2026-01-05T09:08' } } })).not.toBe(typedFiltersKey(query));
+  });
+});

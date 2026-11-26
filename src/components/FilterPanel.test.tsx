@@ -160,3 +160,75 @@ describe('FilterPanel', () => {
     expect(screen.getByRole('combobox', { name: 'State' })).toHaveValue('');
   });
 });
+
+describe('FilterPanel datetime filters', () => {
+  const columns: Column<Row>[] = [
+    { key: 'at', header: 'At', filter: { type: 'datetime' } },
+    { key: 'window', header: 'Window', filter: { type: 'datetime', op: 'range' } },
+  ];
+
+  function renderPanel(initial: FilterState = {}) {
+    const onChange = vi.fn();
+    function Panel() {
+      const [filters, setFilters] = useState<FilterState>(initial);
+      const change = (key: string, value: FilterValue) => {
+        setFilters((current) => ({ ...current, [key]: value }));
+        onChange(key, value);
+      };
+      return <FilterPanel columns={columns} filters={filters} onFilterChange={change} labels={DEFAULT_LABELS} />;
+    }
+    render(<Panel />);
+    return onChange;
+  }
+
+  it('edits a minute with a native datetime-local input; empty clears it', () => {
+    const onChange = renderPanel();
+    const at = screen.getByLabelText('At');
+    expect(at).toHaveAttribute('type', 'datetime-local');
+    fireEvent.change(at, { target: { value: '2026-01-05T09:07' } });
+    expect(onChange).toHaveBeenLastCalledWith('at', '2026-01-05T09:07');
+    expect(at).toHaveValue('2026-01-05T09:07');
+    fireEvent.change(at, { target: { value: '' } });
+    expect(onChange).toHaveBeenLastCalledWith('at', null);
+  });
+
+  it('shows any stored date-time as its local minute', () => {
+    renderPanel({ at: '2026-01-05T14:07:45Z', window: [new Date(2026, 0, 5, 8, 30, 15) as unknown as string, 'soon'] });
+    expect(screen.getByLabelText('At')).toHaveValue('2026-01-05T09:07');
+    expect(screen.getByLabelText('Window from')).toHaveValue('2026-01-05T08:30');
+    expect(screen.getByLabelText('Window to')).toHaveValue('');
+  });
+
+  it('edits a range with two named datetime-local inputs, keeping the other end', () => {
+    const onChange = renderPanel({ window: ['2026-01-05T09:00', null] });
+    expect(screen.getByLabelText('Window from')).toHaveValue('2026-01-05T09:00');
+    const to = screen.getByLabelText('Window to');
+    expect(to).toHaveAttribute('type', 'datetime-local');
+    fireEvent.change(to, { target: { value: '2026-01-05T17:30' } });
+    expect(onChange).toHaveBeenLastCalledWith('window', ['2026-01-05T09:00', '2026-01-05T17:30']);
+  });
+});
+
+describe('FilterPanel wheel safety', () => {
+  it('blurs a focused number input on wheel without cancelling the scroll', () => {
+    setup();
+    for (const name of ['Age', 'Score from', 'Score to']) {
+      const input = screen.getByRole('spinbutton', { name });
+      input.focus();
+      expect(fireEvent.wheel(input, { deltaY: 100 })).toBe(true);
+      expect(input).not.toHaveFocus();
+    }
+  });
+
+  it('leaves focus alone when the number input is not focused, and on date inputs', () => {
+    setup();
+    const name = screen.getByRole('textbox', { name: 'Name' });
+    name.focus();
+    fireEvent.wheel(screen.getByRole('spinbutton', { name: 'Age' }));
+    expect(name).toHaveFocus();
+    const born = screen.getByLabelText('Born');
+    born.focus();
+    fireEvent.wheel(born);
+    expect(born).toHaveFocus();
+  });
+});

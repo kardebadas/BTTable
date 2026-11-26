@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_LABELS } from '../labels';
@@ -120,5 +120,25 @@ describe('Pagination', () => {
     setup({ labels: { ...DEFAULT_LABELS, pagination: 'Páginas', pageOf: 'de {count}', nextPage: 'Seguinte' } });
     expect(screen.getByRole('navigation', { name: 'Páginas' })).toHaveTextContent('de 5');
     expect(screen.getByRole('button', { name: 'Seguinte' })).toBeInTheDocument();
+  });
+});
+
+describe('Pagination wheel safety', () => {
+  it('blurs the focused page input on wheel, so the page never steps, without cancelling the scroll', () => {
+    const { onPageChange } = setup();
+    const input = pageInput();
+    input.focus();
+    expect(fireEvent.wheel(input, { deltaY: -100 })).toBe(true);
+    expect(input).not.toHaveFocus();
+    expect(input).toHaveValue(2);
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('ignores the wheel while the page input is not focused', () => {
+    setup();
+    const next = screen.getByRole('button', { name: DEFAULT_LABELS.nextPage });
+    next.focus();
+    fireEvent.wheel(pageInput());
+    expect(next).toHaveFocus();
   });
 });

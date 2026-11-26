@@ -104,3 +104,40 @@ export function formatIsoDay(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${month}-${day}`;
 }
+
+type ClockParts = Pick<DateParts, 'year' | 'month' | 'day' | 'hour' | 'minute'>;
+
+/** The ordered wall-clock key yyyymmddhhmm of calendar and clock fields. */
+function clockKey({ year, month, day, hour, minute }: ClockParts): number {
+  return ((year * 100 + month) * 100 + day) * 10_000 + hour * 100 + minute;
+}
+
+/** The fields of a date string that names no zone, else `null`. */
+function zonelessParts(text: string): DateParts | null {
+  const parts = matchIso(text) ?? matchUs(text);
+  return parts && parts.zone === undefined ? parts : null;
+}
+
+/** The local calendar and clock fields of an instant. */
+function localParts(date: Date): ClockParts {
+  return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), hour: date.getHours(), minute: date.getMinutes() };
+}
+
+/**
+ * An ordered number identifying the local wall-clock minute of a date value
+ * (yyyymmddhhmm), or `null` when it is not a date. Seconds are dropped. A string without a
+ * zone keeps the clock time it names, so a time a DST change skips or repeats compares as
+ * written; a `Date` or a zoned string uses the local clock time of its instant.
+ */
+export function minuteKey(value: unknown): number | null {
+  const date = parseDate(value);
+  if (!date) return null;
+  const parts = typeof value === 'string' ? zonelessParts(value.trim()) : null;
+  return clockKey(parts ?? localParts(date));
+}
+
+/** A `minuteKey` as the local `yyyy-mm-ddThh:mm` string of `<input type="datetime-local">`. */
+export function formatMinuteKey(key: number): string {
+  const digits = String(key).padStart(12, '0');
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}T${digits.slice(8, 10)}:${digits.slice(10)}`;
+}

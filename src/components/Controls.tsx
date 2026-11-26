@@ -40,6 +40,12 @@ export type ControlProps = {
    * pass a fixed one when server rendering, so the server and the browser agree.
    */
   locale?: string;
+  /**
+   * Where multi-select filter popovers are portalled, so an `overflow: hidden` ancestor
+   * never clips them. Default `document.body`; pass an element inside a modal dialog that
+   * traps focus. The popover copies the table's theme, so it renders the same anywhere.
+   */
+  portalContainer?: HTMLElement | null;
 };
 
 /** State and actions the controls read, whatever the data mode. */
@@ -131,7 +137,7 @@ export function TopControls<R>(props: ControlsInput<R>) {
   return (
     <>
       <ErrorBoundary fallback={fallback} onError={props.onError} resetKey={props.columns}>
-        <FilterPanel columns={props.columns} filters={controls.filters} onFilterChange={controls.setFilter} labels={labels} />
+        <FilterPanel columns={props.columns} filters={controls.filters} onFilterChange={controls.setFilter} labels={labels} portalContainer={props.portalContainer} />
       </ErrorBoundary>
       <Toolbar
         labels={labels}

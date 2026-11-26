@@ -10,6 +10,8 @@ export type FilterPanelProps<R> = {
   filters: FilterState;
   onFilterChange: (key: string, value: FilterValue) => void;
   labels: BTTableLabels;
+  /** Where multi-select popovers are portalled; default `document.body`. */
+  portalContainer?: HTMLElement | null;
 };
 
 const GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' };
@@ -20,7 +22,7 @@ const GRID: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto
  * values come from `filters` and edits go out through `onFilterChange`. Renders nothing
  * when no column is filterable.
  */
-export function FilterPanel<R>({ columns, filters, onFilterChange, labels }: FilterPanelProps<R>) {
+export function FilterPanel<R>({ columns, filters, onFilterChange, labels, portalContainer }: FilterPanelProps<R>) {
   const baseId = useId();
   const filterable = columns.filter((column) => column.filter);
   if (filterable.length === 0) return null;
@@ -42,6 +44,7 @@ export function FilterPanel<R>({ columns, filters, onFilterChange, labels }: Fil
               value={filters[column.key]}
               onChange={(value) => onFilterChange(column.key, value)}
               labels={labels}
+              portalContainer={portalContainer}
             />
           </div>
         );

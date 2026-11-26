@@ -11,6 +11,7 @@ export type {
   FetchRows,
   FilterSpec,
   FilterState,
+  FilterType,
   FilterValue,
   NumberOp,
   Option,
@@ -19,6 +20,9 @@ export type {
   TextOp,
 } from './core/types';
 export { compareValues } from './core/compare';
+export { filterRows, type FilterRowsInput, isFilterActive, matchesFilter, normalizeFilterType } from './core/filters';
+export { buildQuery, type QueryState } from './core/query';
+export { matchesSearch } from './core/search';
 export { parseDate } from './core/dates';
 export { buildExportData, toCsv } from './core/export';
 export { formatValue } from './core/values';
