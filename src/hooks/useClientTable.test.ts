@@ -317,3 +317,33 @@ describe('review fixes', () => {
     expect(onStateChange).toHaveBeenCalledTimes(calls);
   });
 });
+
+describe('search texts', () => {
+  it('are not built until a search term is typed, then built once per row in the background', () => {
+    const searchValue = vi.fn((row: Row) => row.name);
+    const columns: Column<Row>[] = [{ key: 'name', header: 'Name', searchValue }];
+    const { result } = setup({ rows: many(5000), columns, searchDebounceMs: 1000 });
+    act(() => vi.advanceTimersByTime(5000));
+    act(() => result.current.toggleSort('name'));
+    expect(searchValue).not.toHaveBeenCalled();
+    act(() => result.current.setSearch('r12'));
+    act(() => vi.advanceTimersByTime(500));
+    expect(searchValue).toHaveBeenCalledTimes(5000);
+    act(() => vi.advanceTimersByTime(500));
+    expect(result.current.filteredRows.length).toBeGreaterThan(0);
+    expect(searchValue).toHaveBeenCalledTimes(5000);
+  });
+});
+
+describe('warmSearch', () => {
+  it('builds the search texts in the background without a search term', () => {
+    const searchValue = vi.fn((row: Row) => row.name);
+    const { result } = setup({ rows: many(5000), columns: [{ key: 'name', header: 'Name', searchValue }] });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(searchValue).not.toHaveBeenCalled();
+    act(() => result.current.warmSearch());
+    act(() => vi.advanceTimersByTime(500));
+    expect(searchValue).toHaveBeenCalledTimes(5000);
+    expect(result.current.search).toBe('');
+  });
+});

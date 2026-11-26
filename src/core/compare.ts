@@ -1,10 +1,19 @@
 import { parseDate } from './dates';
 import { formatValue, toNumber } from './values';
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+/** The one collator text sort keys are compared with: numeric, case- and accent-insensitive. */
+export const textCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-/** Kind rank (numbers, then dates, then text) and the key compared within that kind. */
-type SortKey = { rank: 0 | 1 | 2; num: number; text: string };
+/** Blanks rank after every present kind. */
+const BLANK_RANK = 3;
+
+/**
+ * A value's sort key: kind rank (numbers 0, dates 1, text 2, blank 3) and the key compared
+ * within that kind. Build it once per value and compare keys with `compareSortKeys`.
+ */
+export type SortKey = { readonly rank: 0 | 1 | 2 | 3; readonly num: number; readonly text: string };
+
+const BLANK_KEY: SortKey = { rank: BLANK_RANK, num: 0, text: '' };
 
 /** null, undefined, blank strings, NaN and invalid dates sort as missing. */
 function isBlank(value: unknown): boolean {
@@ -14,8 +23,9 @@ function isBlank(value: unknown): boolean {
   return value instanceof Date && Number.isNaN(value.getTime());
 }
 
-/** Classifies a present value as a number (incl. booleans, numeric strings), a date, or text. */
-function sortKey(value: unknown): SortKey {
+/** Classifies a value as blank, a number (incl. booleans, numeric strings), a date, or text. */
+export function sortKey(value: unknown): SortKey {
+  if (isBlank(value)) return BLANK_KEY;
   if (typeof value === 'number') return { rank: 0, num: value, text: '' };
   if (typeof value === 'boolean') return { rank: 0, num: Number(value), text: '' };
   const num = toNumber(value);
@@ -25,13 +35,19 @@ function sortKey(value: unknown): SortKey {
   return { rank: 2, num: 0, text: formatValue(value) };
 }
 
-/** Total order: by kind rank first, then numerically or by collator within a kind. */
-function comparePresent(a: unknown, b: unknown): number {
-  const keyA = sortKey(a);
-  const keyB = sortKey(b);
-  if (keyA.rank !== keyB.rank) return keyA.rank - keyB.rank;
-  if (keyA.rank === 2) return collator.compare(keyA.text, keyB.text);
-  return Math.sign(keyA.num - keyB.num);
+/** Total order of present keys: by kind rank first, then numerically or by collator within a kind. */
+function comparePresent(a: SortKey, b: SortKey): number {
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  if (a.rank === 2) return textCollator.compare(a.text, b.text);
+  return Math.sign(a.num - b.num);
+}
+
+/** `compareValues` on prebuilt keys: blanks last in both directions, present keys by kind then value. */
+export function compareSortKeys(a: SortKey, b: SortKey, direction: 'asc' | 'desc' = 'asc'): number {
+  if (a.rank === BLANK_RANK || b.rank === BLANK_RANK) return Number(a.rank === BLANK_RANK) - Number(b.rank === BLANK_RANK);
+  const result = comparePresent(a, b);
+  if (direction === 'asc' || result === 0) return result;
+  return -result;
 }
 
 /**
@@ -42,10 +58,5 @@ function comparePresent(a: unknown, b: unknown): number {
  * collator. Use with the stable `Array.prototype.sort`.
  */
 export function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'): number {
-  const blankA = isBlank(a);
-  const blankB = isBlank(b);
-  if (blankA || blankB) return Number(blankA) - Number(blankB);
-  const result = comparePresent(a, b);
-  if (direction === 'asc' || result === 0) return result;
-  return -result;
+  return compareSortKeys(sortKey(a), sortKey(b), direction);
 }

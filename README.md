@@ -240,7 +240,7 @@ or the load error has the class `btt-empty-row` instead.
 | Prop | Default | Meaning |
 | --- | --- | --- |
 | `columns` | required | Column definitions. Keep the array stable (module-level or `useMemo`). |
-| `rows` | – | Client mode data: an array or an object map (keys are the id fallback). Keep the array stable: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
+| `rows` | – | Client mode data: an array or an object map (keys are the id fallback). Treat it as immutable: **an edit must pass a new array** (or map), e.g. `rows.map((r) => (r.id === id ? { ...r, score } : r))`. Sort, filter and search values are cached per array, so a row changed in place, or a new row object put into the same array, keeps sorting, filtering and matching on its old values (not supported). Pass the same array while nothing changed: a new array re-filters and re-sorts every row. A new array for the same view (polling) keeps the scroll position. |
 | `fetchRows` | – | Server mode data source; see [Server mode](#server-mode). A new function identity does not refetch. |
 | `fetchAllRows` | – | Server and manual mode: `(query, { signal }) => Promise<R[]>`, every row matching the query without paging, so exports cover every filtered row; see [Export](#export). Not accepted in client mode (a type error): client exports already cover every filtered row. |
 | `mode` | – | `"manual"`: the parent loads each page; see [Manual mode](#manual-mode). |
@@ -754,11 +754,42 @@ carry a time of day), everything else becomes its display text, never a React no
 `columns`, `rows`, `getRowId`, `rowClassName`, `rowProps`, `rowTone`, `renderDetail`. Rows are memoized on their
 identity: a new `columns` array or callback re-renders every row, and a new `rows` array or
 `getRowId` re-filters, re-sorts and re-derives the whole list on every parent render.
+Stable is not mutable: edit rows by passing a new `rows` array, never in place (see `rows`
+under [Data](#data)).
 
 ```tsx
 const columns = useMemo(() => buildColumns(t), [t]);
 const rowProps = useCallback((row: Person) => ({ onClick: () => open(row.id) }), [open]);
 ```
+
+### Large data (up to 1M rows)
+
+Client mode handles 1,000,000 rows (measured in Chrome and Firefox, see
+[docs/benchmarks.md](docs/benchmarks.md)): 60 fps wheel and thumb scrolling, every row
+reachable, first render ~0.2–0.3 s.
+
+- **Scroll space is capped at ~15M px** (browsers cap element heights at ~17.9M px in
+  Firefox, ~33.5M px in Chrome). Above the cap the scrollbar maps proportionally to the
+  rows: small scrolls still move the content pixel for pixel, but at 1M rows one pixel of
+  thumb travel spans many rows, so fine positioning is by wheel or keys.
+- **End** on the scroll container or a data row jumps to the last row and keeps it in view
+  while the rows near it are measured. Form controls, editable content, detail rows and
+  elements that scroll on their own keep their End. Opening a detail row, or pressing a row,
+  keeps that row in place instead of the bottom.
+- **Thumb drag detection** assumes a classic scrollbar on the right of the scroll container
+  (a press right of its content box). With overlay scrollbars (macOS default, mobile) or a
+  right-to-left layout (scrollbar on the left) a drag is not detected: the body height is
+  not frozen, so in Chrome the thumb can slip as rows are measured during the drag.
+- **Memory:** ~470 MB JS heap at 1M rows in the bench (mostly the rows themselves), plus one
+  lowercase search string per row once search is used.
+- **First search** builds those strings: ~1.7 s (Chrome) / ~3 s (Firefox) at 1M. Building
+  starts in the background when the search box gets focus, so a user who focuses and then
+  types rarely waits; later searches take ~110 ms.
+- **First sort of a column** ranks its values once: ~0.5 s at 1M; later sorts ~0.2–0.3 s.
+- Thumb dragging is measured in Chrome only (headless Firefox draws no scrollbar).
+
+Beyond that (more rows, heavier rows, or slower devices) use [server mode](#server-mode) or
+[manual mode](#manual-mode), which only ever hold one page.
 
 ## Imperative handle (ref)
 

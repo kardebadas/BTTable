@@ -38,6 +38,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "demo": "vite demo --port 5199 --strictPort",
+    "bench": "node bench/harness/run.ts",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "peerDependencies": {
@@ -58,6 +59,7 @@
     "eslint": "^10.15.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^31.0.1",
+    "playwright-core": "1.61.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tsup": "^9.0.0",

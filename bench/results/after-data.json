@@ -1,0 +1,1467 @@
+{
+  "label": "after-data",
+  "machine": {
+    "cpu": "AMD Ryzen 7 5800X3D 8-Core Processor",
+    "cores": 12,
+    "node": "v24.22.3",
+    "date": "2026-11-26T10:32:03.363Z"
+  },
+  "results": [
+    {
+      "browser": "chrome",
+      "version": "157.0.8103.78",
+      "n": 10000,
+      "steps": {
+        "load": {
+          "ms": 158,
+          "value": {
+            "genMs": 20.899999856948853,
+            "firstRowsMs": 51.40000009536743,
+            "navToRowsMs": 135.60000014305115
+          }
+        },
+        "heap": {
+          "ms": 24,
+          "value": {
+            "jsHeapMB": 9
+          }
+        },
+        "offsetsPass": {
+          "ms": 4,
+          "value": {
+            "medianMs": 0.6000001430511475
+          }
+        },
+        "wheel": {
+          "ms": 3198,
+          "value": {
+            "frames": {
+              "count": 186,
+              "p50": 16.699999999999818,
+              "p95": 16.799999999999727,
+              "max": 16.800000000000182,
+              "total": 3099.8999999999924
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 178,
+              "p50": 0,
+              "p95": 0.10000014305114746,
+              "max": 0.2999999523162842,
+              "total": 6.500000476837158
+            },
+            "wheelEvents": 178,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 276727,
+            "scrollHeight": 577587,
+            "clientHeight": 598,
+            "lastMountedId": 2517
+          }
+        },
+        "drag": {
+          "ms": 2884,
+          "value": {
+            "frames": {
+              "count": 164,
+              "p50": 16.699999999999818,
+              "p95": 16.700000000000728,
+              "max": 16.800000000000182,
+              "total": 2733.2
+            },
+            "headerDriftPx": 0,
+            "dragMoved": true,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 389483,
+            "scrollHeight": 602770,
+            "clientHeight": 598,
+            "lastMountedId": 4717
+          }
+        },
+        "endKey": {
+          "ms": 380,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 604868,
+            "scrollHeight": 612299,
+            "clientHeight": 598,
+            "lastMountedId": 9845
+          }
+        },
+        "scrollTopMax": {
+          "ms": 199,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 612179,
+            "scrollHeight": 613502,
+            "clientHeight": 598,
+            "lastMountedId": 9999
+          }
+        },
+        "scrollToRow": {
+          "ms": 200,
+          "value": {
+            "accepted": true,
+            "msToVisible": 32.09999990463257,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 612903,
+            "scrollHeight": 613502,
+            "clientHeight": 598,
+            "lastMountedId": 10000
+          }
+        },
+        "sort": {
+          "ms": 533,
+          "value": {
+            "ascMs": 27.90000009536743,
+            "descMs": 30.90000009536743
+          }
+        },
+        "search": {
+          "ms": 383,
+          "value": {
+            "term": "lopes",
+            "queryMs": 40.59999990463257,
+            "matchedRows": 826,
+            "clearMs": 45.5
+          }
+        },
+        "selectAll": {
+          "ms": 383,
+          "value": {
+            "selectMs": 29.799999952316284,
+            "clearMs": 28.399999856948853
+          }
+        },
+        "profileWheel": {
+          "ms": 3265,
+          "value": [
+            {
+              "fn": "(idle) :0",
+              "selfMs": 2119
+            },
+            {
+              "fn": "(program) :0",
+              "selfMs": 383
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 380
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15744",
+              "selfMs": 29
+            },
+            {
+              "fn": "removeChild :0",
+              "selfMs": 25
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "selfMs": 21
+            },
+            {
+              "fn": "offsetsOf index-CiMwlJJx.js:15743",
+              "selfMs": 20
+            },
+            {
+              "fn": "createElement :0",
+              "selfMs": 14
+            },
+            {
+              "fn": "completeWork index-CiMwlJJx.js:5809",
+              "selfMs": 12
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "selfMs": 12
+            },
+            {
+              "fn": "setAttribute :0",
+              "selfMs": 11
+            },
+            {
+              "fn": "Cell index-CiMwlJJx.js:13620",
+              "selfMs": 11
+            }
+          ]
+        },
+        "profileSearch": {
+          "ms": 407,
+          "value": [
+            {
+              "fn": "(idle) :0",
+              "selfMs": 346
+            },
+            {
+              "fn": "(program) :0",
+              "selfMs": 37
+            },
+            {
+              "fn": "scrollToTop index-CiMwlJJx.js:15906",
+              "selfMs": 3
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 2
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15744",
+              "selfMs": 1
+            },
+            {
+              "fn": "unitHeight index-CiMwlJJx.js:15762",
+              "selfMs": 1
+            },
+            {
+              "fn": "tableReducer index-CiMwlJJx.js:14660",
+              "selfMs": 1
+            },
+            {
+              "fn": "setTextContent index-CiMwlJJx.js:1816",
+              "selfMs": 1
+            },
+            {
+              "fn": "pruneHeights index-CiMwlJJx.js:15815",
+              "selfMs": 1
+            },
+            {
+              "fn": "scrollState index-CiMwlJJx.js:16724",
+              "selfMs": 0
+            },
+            {
+              "fn": "DataRow index-CiMwlJJx.js:13699",
+              "selfMs": 0
+            },
+            {
+              "fn": "setAttribute :0",
+              "selfMs": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "browser": "chrome",
+      "version": "157.0.8103.78",
+      "n": 100000,
+      "steps": {
+        "load": {
+          "ms": 281,
+          "value": {
+            "genMs": 147.90000009536743,
+            "firstRowsMs": 78.29999995231628,
+            "navToRowsMs": 284.09999990463257
+          }
+        },
+        "heap": {
+          "ms": 95,
+          "value": {
+            "jsHeapMB": 54
+          }
+        },
+        "offsetsPass": {
+          "ms": 31,
+          "value": {
+            "medianMs": 3.299999952316284
+          }
+        },
+        "wheel": {
+          "ms": 3221,
+          "value": {
+            "frames": {
+              "count": 187,
+              "p50": 16.699999999999818,
+              "p95": 16.700000000000273,
+              "max": 16.800000000000182,
+              "total": 3116.4999999999936
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 167,
+              "p50": 0,
+              "p95": 0.10000014305114746,
+              "max": 0.2999999523162842,
+              "total": 7.100001335144043
+            },
+            "wheelEvents": 168,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 261930,
+            "scrollHeight": 4168459,
+            "clientHeight": 598,
+            "lastMountedId": 2386
+          }
+        },
+        "drag": {
+          "ms": 2732,
+          "value": {
+            "frames": {
+              "count": 155,
+              "p50": 16.699999999999818,
+              "p95": 16.700000000000728,
+              "max": 16.800000000000182,
+              "total": 2583.3
+            },
+            "headerDriftPx": 0,
+            "dragMoved": true,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 2150121,
+            "scrollHeight": 4230654,
+            "clientHeight": 598,
+            "lastMountedId": 48033
+          }
+        },
+        "endKey": {
+          "ms": 416,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 4234965,
+            "scrollHeight": 4249519,
+            "clientHeight": 598,
+            "lastMountedId": 99693
+          }
+        },
+        "scrollTopMax": {
+          "ms": 200,
+          "value": {
+            "inDom": true,
+            "visible": false,
+            "scrollTop": 4249232,
+            "scrollHeight": 4250774,
+            "clientHeight": 598,
+            "lastMountedId": 100000
+          }
+        },
+        "scrollToRow": {
+          "ms": 201,
+          "value": {
+            "accepted": true,
+            "msToVisible": 32.10000014305115,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 4250176,
+            "scrollHeight": 4250774,
+            "clientHeight": 598,
+            "lastMountedId": 100000
+          }
+        },
+        "sort": {
+          "ms": 547,
+          "value": {
+            "ascMs": 45,
+            "descMs": 31.700000047683716
+          }
+        },
+        "search": {
+          "ms": 384,
+          "value": {
+            "term": "lopes",
+            "queryMs": 44.90000009536743,
+            "matchedRows": 8295,
+            "clearMs": 44.5
+          }
+        },
+        "selectAll": {
+          "ms": 383,
+          "value": {
+            "selectMs": 30.5,
+            "clearMs": 27.899999856948853
+          }
+        },
+        "profileWheel": {
+          "ms": 3300,
+          "value": [
+            {
+              "fn": "(idle) :0",
+              "selfMs": 1566
+            },
+            {
+              "fn": "(program) :0",
+              "selfMs": 463
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 398
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15744",
+              "selfMs": 298
+            },
+            {
+              "fn": "offsetsOf index-CiMwlJJx.js:15743",
+              "selfMs": 181
+            },
+            {
+              "fn": "rowOffsets index-CiMwlJJx.js:13983",
+              "selfMs": 60
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "selfMs": 27
+            },
+            {
+              "fn": "removeChild :0",
+              "selfMs": 23
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "selfMs": 20
+            },
+            {
+              "fn": "setAttribute :0",
+              "selfMs": 19
+            },
+            {
+              "fn": "setTextContent index-CiMwlJJx.js:1816",
+              "selfMs": 12
+            },
+            {
+              "fn": "createElement :0",
+              "selfMs": 10
+            }
+          ]
+        },
+        "profileSearch": {
+          "ms": 438,
+          "value": [
+            {
+              "fn": "(idle) :0",
+              "selfMs": 308
+            },
+            {
+              "fn": "(program) :0",
+              "selfMs": 94
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15744",
+              "selfMs": 5
+            },
+            {
+              "fn": "pruneHeights index-CiMwlJJx.js:15815",
+              "selfMs": 5
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 4
+            },
+            {
+              "fn": "scrollToTop index-CiMwlJJx.js:15906",
+              "selfMs": 3
+            },
+            {
+              "fn": "offsetsOf index-CiMwlJJx.js:15743",
+              "selfMs": 2
+            },
+            {
+              "fn": "rowOffsets index-CiMwlJJx.js:13983",
+              "selfMs": 2
+            },
+            {
+              "fn": "appendChild :0",
+              "selfMs": 1
+            },
+            {
+              "fn": "removeChild :0",
+              "selfMs": 1
+            },
+            {
+              "fn": "(anonymous) :0",
+              "selfMs": 1
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15199",
+              "selfMs": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "browser": "chrome",
+      "version": "157.0.8103.78",
+      "n": 500000,
+      "steps": {
+        "load": {
+          "ms": 936,
+          "value": {
+            "genMs": 697.5999999046326,
+            "firstRowsMs": 177.59999990463257,
+            "navToRowsMs": 939.8999998569489
+          }
+        },
+        "heap": {
+          "ms": 230,
+          "value": {
+            "jsHeapMB": 239
+          }
+        },
+        "offsetsPass": {
+          "ms": 70,
+          "value": {
+            "medianMs": 12.699999809265137
+          }
+        },
+        "wheel": {
+          "ms": 3272,
+          "value": {
+            "frames": {
+              "count": 170,
+              "p50": 16.699999999999818,
+              "p95": 33.30000000000018,
+              "max": 33.40000000000009,
+              "total": 3116.600000000001
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 80,
+              "p50": 0,
+              "p95": 0.10000014305114746,
+              "max": 0.20000004768371582,
+              "total": 4.000000953674316
+            },
+            "wheelEvents": 82,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 127611,
+            "scrollHeight": 20082176,
+            "clientHeight": 598,
+            "lastMountedId": 1187
+          }
+        },
+        "drag": {
+          "ms": 3266,
+          "value": {
+            "frames": {
+              "count": 185,
+              "p50": 16.699999999999818,
+              "p95": 16.799999999999272,
+              "max": 49.900000000000546,
+              "total": 3116.5
+            },
+            "headerDriftPx": 0,
+            "dragMoved": true,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 10244444,
+            "scrollHeight": 20152854,
+            "clientHeight": 598,
+            "lastMountedId": 252362
+          }
+        },
+        "endKey": {
+          "ms": 383,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 20156640,
+            "scrollHeight": 20169890,
+            "clientHeight": 598,
+            "lastMountedId": 499725
+          }
+        },
+        "scrollTopMax": {
+          "ms": 200,
+          "value": {
+            "inDom": true,
+            "visible": false,
+            "scrollTop": 20169972,
+            "scrollHeight": 20171290,
+            "clientHeight": 598,
+            "lastMountedId": 500000
+          }
+        },
+        "scrollToRow": {
+          "ms": 233,
+          "value": {
+            "accepted": true,
+            "msToVisible": 44.799999952316284,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 20170692,
+            "scrollHeight": 20171288,
+            "clientHeight": 598,
+            "lastMountedId": 500000
+          }
+        },
+        "sort": {
+          "ms": 899,
+          "value": {
+            "ascMs": 283.69999980926514,
+            "descMs": 134.40000009536743
+          }
+        },
+        "search": {
+          "ms": 434,
+          "value": {
+            "term": "lopes",
+            "queryMs": 74.70000004768372,
+            "matchedRows": 41772,
+            "clearMs": 77.70000004768372
+          }
+        },
+        "selectAll": {
+          "ms": 433,
+          "value": {
+            "selectMs": 54.60000014305115,
+            "clearMs": 59.80000019073486
+          }
+        },
+        "profileWheel": {
+          "ms": 3670,
+          "value": [
+            {
+              "fn": "(idle) :0",
+              "selfMs": 1205
+            },
+            {
+              "fn": "(program) :0",
+              "selfMs": 708
+            },
+            {
+              "fn": "offsetsOf index-CiMwlJJx.js:15743",
+              "selfMs": 666
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15744",
+              "selfMs": 384
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 217
+            },
+            {
+              "fn": "rowOffsets index-CiMwlJJx.js:13983",
+              "selfMs": 198
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "selfMs": 93
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "selfMs": 18
+            },
+            {
+              "fn": "removeChild :0",
+              "selfMs": 16
+            },
+            {
+              "fn": "setAttribute :0",
+              "selfMs": 6
+            },
+            {
+              "fn": "completeWork index-CiMwlJJx.js:5809",
+              "selfMs": 5
+            },
+            {
+              "fn": "renderWithHooks index-CiMwlJJx.js:3799",
+              "selfMs": 5
+            }
+          ]
+        },
+        "profileSearch": {
+          "ms": 720,
+          "value": [
+            {
+              "fn": "(program) :0",
+              "selfMs": 313
+            },
+            {
+              "fn": "(idle) :0",
+              "selfMs": 289
+            },
+            {
+              "fn": "pruneHeights index-CiMwlJJx.js:15815",
+              "selfMs": 36
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15744",
+              "selfMs": 21
+            },
+            {
+              "fn": "offsetsOf index-CiMwlJJx.js:15743",
+              "selfMs": 16
+            },
+            {
+              "fn": "rowOffsets index-CiMwlJJx.js:13983",
+              "selfMs": 7
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15199",
+              "selfMs": 6
+            },
+            {
+              "fn": "scrollToTop index-CiMwlJJx.js:15906",
+              "selfMs": 5
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 2
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "selfMs": 2
+            },
+            {
+              "fn": "(anonymous) :1",
+              "selfMs": 1
+            },
+            {
+              "fn": "scrollState index-CiMwlJJx.js:16724",
+              "selfMs": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "browser": "chrome",
+      "version": "157.0.8103.78",
+      "n": 1000000,
+      "steps": {
+        "load": {
+          "ms": 1629,
+          "value": {
+            "genMs": 1178.6000001430511,
+            "firstRowsMs": 378.59999990463257,
+            "navToRowsMs": 1633.7000000476837
+          }
+        },
+        "heap": {
+          "ms": 364,
+          "value": {
+            "jsHeapMB": 474
+          }
+        },
+        "offsetsPass": {
+          "ms": 175,
+          "value": {
+            "medianMs": 32.799999952316284
+          }
+        },
+        "wheel": {
+          "ms": 3255,
+          "value": {
+            "frames": {
+              "count": 121,
+              "p50": 16.800000000000182,
+              "p95": 49.899999999999636,
+              "max": 50.100000000000364,
+              "total": 3133.2
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 54,
+              "p50": 0,
+              "p95": 0.10000014305114746,
+              "max": 0.20000004768371582,
+              "total": 2.699998617172241
+            },
+            "wheelEvents": 61,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 98053,
+            "scrollHeight": 33554430,
+            "clientHeight": 598,
+            "lastMountedId": 980
+          }
+        },
+        "drag": {
+          "ms": 5402,
+          "value": {
+            "frames": {
+              "count": 241,
+              "p50": 16.699999999999818,
+              "p95": 33.399999999999636,
+              "max": 200,
+              "total": 5299.799999999999
+            },
+            "headerDriftPx": 0,
+            "dragMoved": true,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 33553832,
+            "scrollHeight": 33554430,
+            "clientHeight": 598,
+            "lastMountedId": 834059
+          }
+        },
+        "endKey": {
+          "ms": 433,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 33553832,
+            "scrollHeight": 33554430,
+            "clientHeight": 598,
+            "lastMountedId": 833897
+          }
+        },
+        "scrollTopMax": {
+          "ms": 166,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 33553832,
+            "scrollHeight": 33554430,
+            "clientHeight": 598,
+            "lastMountedId": 833897
+          }
+        },
+        "scrollToRow": {
+          "ms": 5184,
+          "value": {
+            "accepted": true,
+            "msToVisible": null,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 33553832,
+            "scrollHeight": 33554430,
+            "clientHeight": 598,
+            "lastMountedId": 833897
+          }
+        },
+        "sort": {
+          "ms": 1632,
+          "value": {
+            "ascMs": 755.2999999523163,
+            "descMs": 315
+          }
+        },
+        "search": {
+          "ms": 567,
+          "value": {
+            "term": "lopes",
+            "queryMs": 143.09999990463257,
+            "matchedRows": 83404,
+            "clearMs": 157.89999985694885
+          }
+        },
+        "selectAll": {
+          "ms": 566,
+          "value": {
+            "selectMs": 135.39999985694885,
+            "clearMs": 128.09999990463257
+          }
+        },
+        "profileWheel": {
+          "ms": 3880,
+          "value": [
+            {
+              "fn": "offsetsOf index-CiMwlJJx.js:15743",
+              "selfMs": 1885
+            },
+            {
+              "fn": "(program) :0",
+              "selfMs": 854
+            },
+            {
+              "fn": "(idle) :0",
+              "selfMs": 663
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 126
+            },
+            {
+              "fn": "rowOffsets index-CiMwlJJx.js:13983",
+              "selfMs": 124
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "selfMs": 63
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "selfMs": 16
+            },
+            {
+              "fn": "removeChild :0",
+              "selfMs": 11
+            },
+            {
+              "fn": "setAttribute :0",
+              "selfMs": 6
+            },
+            {
+              "fn": "commitPassiveUnmountEffectsInsideOfDeletedTree_begin index-CiMwlJJx.js:7660",
+              "selfMs": 5
+            },
+            {
+              "fn": "completeWork index-CiMwlJJx.js:5809",
+              "selfMs": 4
+            },
+            {
+              "fn": "Cell index-CiMwlJJx.js:13620",
+              "selfMs": 4
+            }
+          ]
+        },
+        "profileSearch": {
+          "ms": 1126,
+          "value": [
+            {
+              "fn": "(program) :0",
+              "selfMs": 659
+            },
+            {
+              "fn": "(idle) :0",
+              "selfMs": 254
+            },
+            {
+              "fn": "pruneHeights index-CiMwlJJx.js:15815",
+              "selfMs": 57
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15744",
+              "selfMs": 55
+            },
+            {
+              "fn": "offsetsOf index-CiMwlJJx.js:15743",
+              "selfMs": 47
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15199",
+              "selfMs": 13
+            },
+            {
+              "fn": "rowOffsets index-CiMwlJJx.js:13983",
+              "selfMs": 5
+            },
+            {
+              "fn": "(anonymous) index-CiMwlJJx.js:15816",
+              "selfMs": 5
+            },
+            {
+              "fn": "(garbage collector) :0",
+              "selfMs": 4
+            },
+            {
+              "fn": "scrollToTop index-CiMwlJJx.js:15906",
+              "selfMs": 4
+            },
+            {
+              "fn": "applyMeasurements index-CiMwlJJx.js:15785",
+              "selfMs": 2
+            },
+            {
+              "fn": "render index-CiMwlJJx.js:11606",
+              "selfMs": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "browser": "firefox",
+      "version": "151.0",
+      "n": 10000,
+      "steps": {
+        "load": {
+          "ms": 209,
+          "value": {
+            "genMs": 21,
+            "firstRowsMs": 54,
+            "navToRowsMs": 272
+          }
+        },
+        "heap": {
+          "ms": 0,
+          "value": {
+            "skipped": "no CDP"
+          }
+        },
+        "offsetsPass": {
+          "ms": 9,
+          "value": {
+            "medianMs": 0
+          }
+        },
+        "wheel": {
+          "ms": 3241,
+          "value": {
+            "frames": {
+              "count": 188,
+              "p50": 17.079999999999927,
+              "p95": 17.100000000000364,
+              "max": 17.160000000000082,
+              "total": 3132.8200000000006
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 181,
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "total": 5
+            },
+            "wheelEvents": 181,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 102084,
+            "scrollHeight": 463561,
+            "clientHeight": 598,
+            "lastMountedId": 1002
+          }
+        },
+        "drag": {
+          "ms": 79,
+          "value": {
+            "skipped": "no scrollbar"
+          }
+        },
+        "endKey": {
+          "ms": 401,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 466040,
+            "scrollHeight": 476190,
+            "clientHeight": 598,
+            "lastMountedId": 9797
+          }
+        },
+        "scrollTopMax": {
+          "ms": 199,
+          "value": {
+            "inDom": true,
+            "visible": false,
+            "scrollTop": 476007,
+            "scrollHeight": 477267,
+            "clientHeight": 598,
+            "lastMountedId": 10000
+          }
+        },
+        "scrollToRow": {
+          "ms": 200,
+          "value": {
+            "accepted": true,
+            "msToVisible": 33,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 476668,
+            "scrollHeight": 477267,
+            "clientHeight": 598,
+            "lastMountedId": 10000
+          }
+        },
+        "sort": {
+          "ms": 582,
+          "value": {
+            "ascMs": 27,
+            "descMs": 32
+          }
+        },
+        "search": {
+          "ms": 367,
+          "value": {
+            "term": "lopes",
+            "queryMs": 26,
+            "matchedRows": 826,
+            "clearMs": 24
+          }
+        },
+        "selectAll": {
+          "ms": 400,
+          "value": {
+            "selectMs": 30,
+            "clearMs": 16
+          }
+        },
+        "profileWheel": {
+          "ms": 0,
+          "value": null
+        },
+        "profileSearch": {
+          "ms": 0,
+          "value": null
+        }
+      }
+    },
+    {
+      "browser": "firefox",
+      "version": "151.0",
+      "n": 100000,
+      "steps": {
+        "load": {
+          "ms": 382,
+          "value": {
+            "genMs": 229,
+            "firstRowsMs": 89,
+            "navToRowsMs": 395
+          }
+        },
+        "heap": {
+          "ms": 0,
+          "value": {
+            "skipped": "no CDP"
+          }
+        },
+        "offsetsPass": {
+          "ms": 29,
+          "value": {
+            "medianMs": 4
+          }
+        },
+        "wheel": {
+          "ms": 3277,
+          "value": {
+            "frames": {
+              "count": 185,
+              "p50": 17.079999999999927,
+              "p95": 17.11999999999989,
+              "max": 33.180000000000064,
+              "total": 3133.2000000000016
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 165,
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "total": 5
+            },
+            "wheelEvents": 174,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 98136,
+            "scrollHeight": 4060948,
+            "clientHeight": 598,
+            "lastMountedId": 964
+          }
+        },
+        "drag": {
+          "ms": 116,
+          "value": {
+            "skipped": "no scrollbar"
+          }
+        },
+        "endKey": {
+          "ms": 400,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 4064229,
+            "scrollHeight": 4072975,
+            "clientHeight": 598,
+            "lastMountedId": 99825
+          }
+        },
+        "scrollTopMax": {
+          "ms": 200,
+          "value": {
+            "inDom": true,
+            "visible": false,
+            "scrollTop": 4072688,
+            "scrollHeight": 4074128,
+            "clientHeight": 598,
+            "lastMountedId": 100000
+          }
+        },
+        "scrollToRow": {
+          "ms": 199,
+          "value": {
+            "accepted": true,
+            "msToVisible": 32,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 4073530.25,
+            "scrollHeight": 4074128,
+            "clientHeight": 598,
+            "lastMountedId": 100000
+          }
+        },
+        "sort": {
+          "ms": 650,
+          "value": {
+            "ascMs": 59,
+            "descMs": 48
+          }
+        },
+        "search": {
+          "ms": 366,
+          "value": {
+            "term": "lopes",
+            "queryMs": 26,
+            "matchedRows": 8295,
+            "clearMs": 28
+          }
+        },
+        "selectAll": {
+          "ms": 416,
+          "value": {
+            "selectMs": 32,
+            "clearMs": 31
+          }
+        },
+        "profileWheel": {
+          "ms": 0,
+          "value": null
+        },
+        "profileSearch": {
+          "ms": 0,
+          "value": null
+        }
+      }
+    },
+    {
+      "browser": "firefox",
+      "version": "151.0",
+      "n": 500000,
+      "steps": {
+        "load": {
+          "ms": 1465,
+          "value": {
+            "genMs": 1196,
+            "firstRowsMs": 218,
+            "navToRowsMs": 1481
+          }
+        },
+        "heap": {
+          "ms": 0,
+          "value": {
+            "skipped": "no CDP"
+          }
+        },
+        "offsetsPass": {
+          "ms": 123,
+          "value": {
+            "medianMs": 23
+          }
+        },
+        "wheel": {
+          "ms": 3365,
+          "value": {
+            "frames": {
+              "count": 84,
+              "p50": 33.200000000000045,
+              "p95": 50.38000000000011,
+              "max": 83.09999999999991,
+              "total": 3167.4600000000005
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 75,
+              "p50": 0,
+              "p95": 1,
+              "max": 1,
+              "total": 4
+            },
+            "wheelEvents": 75,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 42300,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 434
+          }
+        },
+        "drag": {
+          "ms": 92,
+          "value": {
+            "skipped": "no scrollbar"
+          }
+        },
+        "endKey": {
+          "ms": 615,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 17894832,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 446481
+          }
+        },
+        "scrollTopMax": {
+          "ms": 166,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 17894832,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 446481
+          }
+        },
+        "scrollToRow": {
+          "ms": 5186,
+          "value": {
+            "accepted": true,
+            "msToVisible": null,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 17894832,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 446481
+          }
+        },
+        "sort": {
+          "ms": 1380,
+          "value": {
+            "ascMs": 376,
+            "descMs": 397
+          }
+        },
+        "search": {
+          "ms": 500,
+          "value": {
+            "term": "lopes",
+            "queryMs": 77,
+            "matchedRows": 41772,
+            "clearMs": 113
+          }
+        },
+        "selectAll": {
+          "ms": 618,
+          "value": {
+            "selectMs": 98,
+            "clearMs": 162
+          }
+        },
+        "profileWheel": {
+          "ms": 0,
+          "value": null
+        },
+        "profileSearch": {
+          "ms": 0,
+          "value": null
+        }
+      }
+    },
+    {
+      "browser": "firefox",
+      "version": "151.0",
+      "n": 1000000,
+      "steps": {
+        "load": {
+          "ms": 3165,
+          "value": {
+            "genMs": 2536,
+            "firstRowsMs": 575,
+            "navToRowsMs": 3180
+          }
+        },
+        "heap": {
+          "ms": 0,
+          "value": {
+            "skipped": "no CDP"
+          }
+        },
+        "offsetsPass": {
+          "ms": 236,
+          "value": {
+            "medianMs": 45
+          }
+        },
+        "wheel": {
+          "ms": 3420,
+          "value": {
+            "frames": {
+              "count": 57,
+              "p50": 66.36000000000058,
+              "p95": 99.61999999999989,
+              "max": 116.68000000000029,
+              "total": 3300.16
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 48,
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "total": 1
+            },
+            "wheelEvents": 48,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 27072,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 286
+          }
+        },
+        "drag": {
+          "ms": 131,
+          "value": {
+            "skipped": "no scrollbar"
+          }
+        },
+        "endKey": {
+          "ms": 653,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 9629974,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 240303
+          }
+        },
+        "scrollTopMax": {
+          "ms": 342,
+          "value": {
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 9534516,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 237910
+          }
+        },
+        "scrollToRow": {
+          "ms": 5166,
+          "value": {
+            "accepted": true,
+            "msToVisible": null,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 9511046,
+            "scrollHeight": 17895430,
+            "clientHeight": 598,
+            "lastMountedId": 237316
+          }
+        },
+        "sort": {
+          "ms": 2131,
+          "value": {
+            "ascMs": 892,
+            "descMs": 579
+          }
+        },
+        "search": {
+          "ms": 650,
+          "value": {
+            "term": "lopes",
+            "queryMs": 125,
+            "matchedRows": 83404,
+            "clearMs": 210
+          }
+        },
+        "selectAll": {
+          "ms": 734,
+          "value": {
+            "selectMs": 214,
+            "clearMs": 166
+          }
+        },
+        "profileWheel": {
+          "ms": 0,
+          "value": null
+        },
+        "profileSearch": {
+          "ms": 0,
+          "value": null
+        }
+      }
+    }
+  ]
+}

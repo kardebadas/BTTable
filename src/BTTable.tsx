@@ -10,7 +10,7 @@ import { getCounter } from './core/pagination';
 import type { FetchRows, Query, SortState } from './core/types';
 import { ownRowId } from './core/values';
 import { shouldVirtualize } from './core/virtual';
-import type { RowEntry, RowId, RowSource } from './hooks/rowModel';
+import { indexOfId, type RowEntry, type RowId, type RowSource } from './hooks/rowModel';
 import { type ClientTable as ClientTableModel, useClientTable } from './hooks/useClientTable';
 import type { Expansion } from './hooks/useExpansion';
 import { allRowsExport } from './hooks/useExportRunner';
@@ -215,7 +215,7 @@ function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): 
 
 /** The page of a filtered row in client mode (1 without pagination); null when filtered out. */
 function clientPageOf<R>(table: ClientTableModel<R>, paginated: boolean, id: RowId): number | null {
-  const index = table.filteredRows.findIndex((entry) => entry.id === id);
+  const index = indexOfId(table.filteredRows, id);
   if (index < 0) return null;
   return paginated ? Math.floor(index / table.pageSize) + 1 : 1;
 }

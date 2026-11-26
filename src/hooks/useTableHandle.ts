@@ -1,9 +1,10 @@
 import { type Ref, type RefObject, useImperativeHandle, useRef } from 'react';
 import { leadingCount } from '../components/ColGroup';
 import type { Column } from '../core/types';
-import type { RowEntry, RowId } from './rowModel';
+import type { Offsets } from '../core/heightTree';
+import { indexOfId, type RowEntry, type RowId } from './rowModel';
 import { useBrowserLayoutEffect } from './useBrowserLayoutEffect';
-import { detailRowOf } from './useVirtualRows';
+import { detailRowOf } from './virtualMeasure';
 
 /** Where `scrollToRow` puts the row in the scroll area (below the sticky header). */
 export type RowAlign = 'start' | 'center' | 'end' | 'nearest';
@@ -51,7 +52,7 @@ export type HandleInput<R> = {
   /** The leading detail toggle column is on (`renderDetail`). */
   expandable?: boolean;
   elements: ReadonlyMap<RowId, HTMLTableRowElement>;
-  virtual: { enabled: boolean; offsets: readonly number[]; jumpTo: (top: number) => void };
+  virtual: { enabled: boolean; offsets: Offsets; jumpTo: (top: number) => void };
   page: number;
   setPage: (page: number) => void;
   /** Client mode: the page of a displayed row, null when filtered out. Paged modes: none. */
@@ -143,20 +144,20 @@ function settle<R>(live: Live<R>): void {
     live.pending = null;
     return reveal(input, row, request);
   }
-  const index = input.entries.findIndex((entry) => entry.id === request.id);
+  const index = indexOfId(input.entries, request.id);
   const retry = !request.jumped || staleWindow(input, request);
   if (index < 0 || !retry || !input.virtual.enabled) {
     live.pending = null;
     return;
   }
   live.pending = { ...request, jumped: true, viewKey: input.viewKey };
-  input.virtual.jumpTo(input.virtual.offsets[index] ?? 0);
+  input.virtual.jumpTo(input.virtual.offsets.offset(index));
 }
 
 /** The page showing the row: client mode asks `findPage`; paged modes only know the current page. */
 function pageOf<R>(input: HandleInput<R>, id: RowId): number | null {
   if (input.findPage) return input.findPage(id);
-  return input.entries.some((entry) => entry.id === id) ? input.page : null;
+  return indexOfId(input.entries, id) >= 0 ? input.page : null;
 }
 
 /** Starts a scroll request: moves to the row's page, or settles it at once on this page. */

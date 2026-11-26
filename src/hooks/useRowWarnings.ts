@@ -42,8 +42,10 @@ const CONFLICTING_IDS =
 export function useRowWarnings<R>(rows: RowSource<unknown>, entries: readonly RowEntry<R>[], getRowId?: (row: R, index: number) => RowId): void {
   const conflicting = useMemo(() => !getRowId && isDevelopment() && entries.some((entry) => hasConflictingIds(entry.row)), [entries, getRowId]);
   useWarnOnce(conflicting, CONFLICTING_IDS);
-  const skipped = sourceSize(rows) - entries.length;
-  const duplicates = useMemo(() => duplicateIdCount(entries), [entries]);
+  // Once per row list, and only in development: both walk every row.
+  const size = useMemo(() => (isDevelopment() ? sourceSize(rows) : 0), [rows]);
+  const skipped = isDevelopment() ? size - entries.length : 0;
+  const duplicates = useMemo(() => (isDevelopment() ? duplicateIdCount(entries) : 0), [entries]);
   useEffect(() => {
     if (!isDevelopment()) return;
     if (skipped > 0) console.warn(`BTTable: skipped ${skipped} invalid rows (null or not an object).`);

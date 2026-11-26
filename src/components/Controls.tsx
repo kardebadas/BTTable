@@ -59,6 +59,8 @@ export type TableControls<R = unknown> = AllRowsExport & {
   setSearch: (text: string) => void;
   /** Empties the search and applies it at once, skipping any debounce. */
   clearSearch: () => void;
+  /** Client mode: starts building the search texts when the search box gets focus. */
+  warmSearch?: () => void;
   filters: FilterState;
   setFilter: (key: string, value: FilterValue) => void;
   /** Empties the search and every filter at once, back to page 1. */
@@ -157,6 +159,7 @@ export function TopControls<R>(props: ControlsInput<R>) {
     placeholder: props.searchPlaceholder ?? 'Search…',
     onChange: controls.setSearch,
     onClear: controls.clearSearch,
+    onFocus: controls.warmSearch,
   };
   return (
     <>
