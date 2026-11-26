@@ -22,34 +22,36 @@ function append<T>(list: readonly T[], value: T): readonly T[] {
 
 /**
  * `to` with the search and filters reported since `from` recorded as waiting for their echo.
- * Any reported change also ends a page hold (the table's next move replaces it); the search
- * and filters holds of a reset stay until their prop changes, so a move made before the
- * parent's echo never brings the pre-reset values back.
+ * The page, search and filters holds stay until their prop changes, so a move made before
+ * the parent's echo (a page move included) never brings the held values back.
  */
 export function recordProposals(from: TableState, to: TableState): TableState {
   if (!reportsChange(from, to)) return to;
-  const { searches, filters, searchHold, filtersHold } = to.proposals;
+  const { searches, filters } = to.proposals;
   return {
     ...to,
     proposals: {
-      searchHold,
-      filtersHold,
+      ...to.proposals,
       searches: from.search === to.search ? searches : append(searches, to.search),
       filters: sameFilters(from.filters, to.filters) ? filters : append(filters, to.filters),
     },
   };
 }
 
-/** A controlled prop's last seen and new value, the own value and the values waiting for an echo. */
-export type PropUpdate<T> = { previous?: T; next?: T; own: T; waiting: readonly T[] };
+/**
+ * A controlled prop's last seen and new value, the own value, the values waiting for an echo
+ * and the held value (the prop a reset moved away from), if any.
+ */
+export type PropUpdate<T> = { previous?: T; next?: T; own: T; waiting: readonly T[]; hold?: T };
 
 /**
- * Classifies a controlled prop that may have changed: `none` (same identity, or equal to
- * the own value), `echo` (equal to a value still waiting for its echo, even an older one),
- * or `change` (a value the parent chose).
+ * Classifies a controlled prop that may have changed: `none` (same identity, equal to the
+ * own value, or still equal to the held value), `echo` (equal to a value still waiting for
+ * its echo, even an older one), or `change` (a value the parent chose).
  */
-export function classify<T>({ previous, next, own, waiting }: PropUpdate<T>, same: Same<T>): Answer {
+export function classify<T>({ previous, next, own, waiting, hold }: PropUpdate<T>, same: Same<T>): Answer {
   if (next === undefined || next === previous) return 'none';
+  if (hold !== undefined && same(next, hold)) return 'none';
   if (waiting.some((item) => same(item, next))) return 'echo';
   return same(next, own) ? 'none' : 'change';
 }

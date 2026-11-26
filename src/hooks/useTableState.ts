@@ -86,14 +86,15 @@ function sameWatched(a: Watched, b: Watched): boolean {
 
 /**
  * The parent's answers since `seen`. A controlled search or filters value equal to the own
- * value, or to any reported value still waiting for its echo, is not a change of its own.
+ * value, to the value held since a reset, or to any reported value still waiting for its
+ * echo, is not a change of its own.
  */
 function answersOf(seen: Watched, next: Watched, own: TableState): Answers {
-  const { searches, filters } = own.proposals;
+  const { searches, filters, searchHold, filtersHold } = own.proposals;
   return {
-    search: classify({ previous: seen.searchValue, next: next.searchValue, own: own.search, waiting: searches }, Object.is),
+    search: classify({ previous: seen.searchValue, next: next.searchValue, own: own.search, waiting: searches, hold: searchHold }, Object.is),
     searchValue: next.searchValue,
-    filters: classify({ previous: seen.filters, next: next.filters, own: own.filters, waiting: filters }, sameFilters),
+    filters: classify({ previous: seen.filters, next: next.filters, own: own.filters, waiting: filters, hold: filtersHold }, sameFilters),
     filterValue: next.filters,
     pageChanged: !Object.is(seen.page, next.page),
   };
@@ -127,17 +128,21 @@ function holdsOf(from: TableState, to: TableState, options: ViewStateProps): Par
   return holds;
 }
 
+/** `to` with its proposals recorded and the controlled props it moved away from held. */
+function heldTransition(from: TableState, to: TableState, options: ViewStateProps): Transition {
+  const recorded = recordProposals(from, to);
+  return { from, to: { ...recorded, proposals: { ...recorded.proposals, ...holdsOf(from, recorded, options) } } };
+}
+
 /**
  * The transition of the parent's changes. `from` already holds the parent's values, so only
  * what the table changed itself (page 1, the reset values) is reported. A page, search or
- * filters value moved under its controlled prop is held on screen until that prop changes or
- * the table's next move.
+ * filters value moved under its controlled prop is held on screen until that prop changes.
  */
 function parentTransition<R>(own: TableState, changes: Changes, options: TableStateOptions<R>): Transition {
   const pageSize = changes.pageSize ? pageSizeOf(options) : own.pageSize;
   const from = { ...controlledState(own, options), pageSize };
-  const to = recordProposals(from, syncedState(from, changes, options));
-  return { from, to: { ...to, proposals: { ...to.proposals, ...holdsOf(from, to, options) } } };
+  return heldTransition(from, syncedState(from, changes, options), options);
 }
 
 /**
@@ -177,12 +182,14 @@ function useReport(report: Transition | null, callbacksRef: Ref<ViewStateProps>)
  * (controlled props applied), the fields it changed go into the own state, and each is
  * reported. Fields it did not change keep their own value, so a late echo of an earlier
  * change is still recognised as one. The latest state is written at once so calls in one handler compose.
+ * A reset (`resetView`) holds the controlled props it moved away from, as a new `resetKey` does.
  */
 function useApply(dispatch: Dispatch<Transition>, latestRef: Ref<TableState>, callbacksRef: Ref<ViewStateProps>): ApplyAction {
   return useCallback(
     (action: TableAction) => {
       const current = latestRef.current;
-      const next = recordProposals(current, tableReducer(current, action));
+      const reduced = tableReducer(current, action);
+      const next = action.type === 'reset' ? heldTransition(current, reduced, callbacksRef.current).to : recordProposals(current, reduced);
       latestRef.current = next;
       dispatch({ from: current, to: next });
       reportChanges(current, next, callbacksRef.current);

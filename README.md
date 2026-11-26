@@ -428,9 +428,11 @@ const [page, setPage] = useState(1);
   page 1, and so does a search or filters value changed by the parent; each such move calls
   `onPageChange(1)` once. When the parent's own change (search, filters, `pageSize`,
   `resetKey`) moves a controlled page, page 1 shows at once, before the parent answers, so
-  server mode asks for page 1 straight away. That held page ends when the `page` prop changes
-  or with the table's next change. A `resetKey` holds a controlled search and filters the same
-  way: the reset values show, and are sent, at once. Page clamping (client: fewer rows; server: a smaller
+  server mode asks for page 1 straight away. That held page ends only when the `page` prop
+  changes: a sort or filter change made meanwhile keeps page 1, and a page the user moves to
+  meanwhile shows and is sent (and proposed through `onPageChange`), so the old page never
+  comes back before the parent answers. A reset (`resetKey` or `resetView()`) holds a
+  controlled search and filters the same way: the reset values show, and are sent, at once. Page clamping (client: fewer rows; server: a smaller
   reported total) calls `onPageChange` with the last page. `resetKey` calls `onSearchChange`,
   `onFiltersChange` and `onPageChange` with the reset values. A changed `pageSize` prop calls
   `onPageChange(1)`, not `onPageSizeChange`.
@@ -446,12 +448,16 @@ const [page, setPage] = useState(1);
   multiselect's compare item by item, so `{ status: params.getAll('status') }` is fine). In
   server mode an echoing parent costs exactly one request per change, and so does a parent
   change under a controlled page.
-- **`resetKey` with controlled search or filters.** A reset is the one exception to
-  "controlled props win": the table reports the reset values and shows (and sends) them at
-  once, while the `searchValue` and `filters` props still hold the old ones. Those held values
-  stay on screen until the prop changes — the echo, or any value you choose — so the table
-  never sends the old search and filters, even after a sort or filter change made before a
-  late echo. A parent that never echoes keeps the reset values on screen.
+- **A reset with controlled search, filters or page.** A reset (`resetKey` or `resetView()`)
+  is the one exception to "controlled props win": the table reports the reset values and shows
+  (and sends) them at once, while the `searchValue`, `filters` and `page` props still hold the
+  old ones. Those held props stay under the table's control until the prop changes — the
+  echo, or any value you choose — so the table never sends the old values, even after a sort,
+  filter or page change made before a late echo. A prop rebuilt on every render with the same
+  old value (`filters={{ state: 'tx' }}`) is still the held value, not a change. A parent that
+  never echoes leaves the held pieces under table control for good: later typing, filtering and
+  paging show, are sent and are reported even though the controlled prop never moves, until
+  the parent sets that prop to a new value.
 - **`onStateChange`** (client) still reports the applied state and the filtered rows.
 
 ## Server mode
@@ -589,7 +595,8 @@ Rules shared with server mode:
   cannot drop out-of-order answers: drop a response whose query is no longer the latest, as
   above (or abort it with an `AbortController`). The scroll position resets when new `rows`
   arrive after a query change: the table takes the next rows you pass as the answer to the
-  latest query, stale or not. Pass `loading` while a page loads, and end it on failure too (store the
+  latest query, stale or not. A reset (`resetKey` or `resetView()`) scrolls to the top at
+  once, without waiting for new `rows`. Pass `loading` while a page loads, and end it on failure too (store the
   failed query, as above), or the table stays loading.
 - **Counter and pages** come from the totals; without a valid total the counter counts the
   rows up to this page, and a full page offers one more page after it. Before the first page
@@ -739,7 +746,8 @@ carry a time of day), everything else becomes its display text, never a React no
   applied search, filters, or `resetKey`. New data for the same view keeps the reader's
   place: a new `rows` array (polling), new `columns` or `getRowId`, and in server mode a
   `refreshKey` refetch, a Retry or any answer to the same query. In server mode the reset
-  happens when the response for the new view arrives.
+  happens when the response for the new view arrives; in manual mode, when the next `rows`
+  arrive, except a reset (`resetKey` or `resetView()`), which scrolls to the top at once.
 - A data row and its open detail row (`renderDetail`) are measured as one unit.
 
 **Keep these props stable** (module-level constants, `useMemo` or `useCallback`):

@@ -147,11 +147,11 @@ describe('page held on page 1 after a parent change', () => {
     expect(pageBox()).toHaveValue(3);
   });
 
-  it('ends with the table\'s next move', () => {
+  it('outlives a table move that keeps the page', () => {
     const { rerender } = setup({ searchValue: '', page: 3 });
     rerender({ searchValue: 'Row', page: 3 });
     fireEvent.click(screen.getByRole('button', { name: 'Name' }));
-    expect(pageBox()).toHaveValue(3);
+    expect(pageBox()).toHaveValue(1);
   });
 });
 
