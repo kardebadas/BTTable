@@ -1007,7 +1007,8 @@ in-memory backend with 300 ms latency, a "Fail next request" button and refresh/
 
 ## License
 
-Free for noncommercial use under the
-[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)
-— see [LICENSE.md](LICENSE.md). Commercial use needs a paid license from the author — see
-[COMMERCIAL.md](COMMERCIAL.md).
+- **Personal use is free** under the
+  [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/),
+  as is use by noncommercial organizations. See [LICENSE.md](LICENSE.md).
+- **Commercial use is for sale.** Email [privacy@thavas.org](mailto:privacy@thavas.org) for a
+  commercial license. See [COMMERCIAL.md](COMMERCIAL.md).
