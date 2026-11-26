@@ -6,7 +6,8 @@ import '../src/styles/controls.css';
 import { COLUMNS, generateRows } from '../demo/data';
 import '../demo/demo.css';
 import { BTTable, type BTTableHandle, type RowId } from '../src';
-import { rowOffsets } from '../src/core/virtual';
+import { HeightTree } from '../src/core/heightTree';
+import { buildTree } from '../src/hooks/virtualMeasure';
 import { afterPaint, recordFrames, resizeCallbackMs, settle, stats, timeResizeObserver } from './probes';
 
 const SIZES = [10_000, 100_000, 500_000, 1_000_000];
@@ -43,13 +44,30 @@ function firstRowText(): string {
 }
 
 /**
- * One offsets pass as `useVirtualRows` does it on every height change (`offsetsOf`:
- * a height per entry from the cache or the estimate, then prefix sums), timed at this `n`.
+ * One measurement as `useVirtualRows` does it on every height change: a batch of 20 row
+ * heights written into the height tree, plus the anchor lookups, timed at this `n`. The
+ * tree itself is built once per row list (`buildTree`), outside the timing.
  */
+const benchTree = new HeightTree(new Float64Array(n).fill(40));
 function offsetsPassMs(): number {
-  const cache = new Map<RowId, number>(rows.slice(0, 40).map((row) => [row.id, 37]));
+  const first = Math.floor(n / 2);
   const start = performance.now();
-  rowOffsets(rows.map((row) => cache.get(row.id) ?? 40));
+  // 1000 rounds: one is far below the timer's resolution.
+  for (let round = 0; round < 1000; round += 1) {
+    const anchor = benchTree.rowAt(first * 40);
+    for (let i = 0; i < 20; i += 1) benchTree.set(first + i, 37 + ((i + round) % 2));
+    benchTree.offset(anchor);
+    benchTree.offset(n);
+  }
+  return (performance.now() - start) / 1000;
+}
+
+/** One `buildTree` pass at this `n` (once per row list: sort, search, new data). */
+function treeBuildMs(): number {
+  const cache = new Map<RowId, number>(rows.slice(0, 40).map((row) => [row.id, 37]));
+  const entries = rows.map((row, index) => ({ row, id: row.id as RowId, index }));
+  const start = performance.now();
+  buildTree(entries, cache, 40);
   return performance.now() - start;
 }
 
@@ -89,6 +107,7 @@ const bench = {
   scrollState,
   firstRowText,
   offsetsPassMs,
+  treeBuildMs,
   resizeStats: (from = 0) => stats(resizeCallbackMs.slice(from)),
   resizeCount: () => resizeCallbackMs.length,
   lastMountedId,

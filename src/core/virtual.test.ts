@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anchoredScrollTop, rowAt, rowOffsets, shouldVirtualize, virtualWindow } from './virtual';
+import { rowAt, rowOffsets, shouldVirtualize, virtualWindow } from './virtual';
 
 const uniform = (count: number, height: number) => rowOffsets(Array.from({ length: count }, () => height));
 
@@ -102,35 +102,6 @@ describe('virtualWindow', () => {
   it('copes with a scroll position past the end (a list that just shrank)', () => {
     const window = virtualWindow({ offsets: uniform(10, 10), scrollTop: 5000, viewportHeight: 50, overscan: 2 });
     expect(window).toEqual({ start: 7, end: 10, padTop: 70, padBottom: 0 });
-  });
-});
-
-describe('anchoredScrollTop', () => {
-  const before = rowOffsets([10, 10, 10, 10, 10]);
-
-  it('moves the scroll position by the height change above the first visible row', () => {
-    // Row 2 is the first visible row, 3 px scrolled into it; row 0 grew by 25 px.
-    const after = rowOffsets([35, 10, 10, 10, 10]);
-    expect(anchoredScrollTop({ before, after, scrollTop: 23 })).toBe(48);
-  });
-
-  it('moves it back up when rows above shrink', () => {
-    const after = rowOffsets([4, 6, 10, 10, 10]);
-    expect(anchoredScrollTop({ before, after, scrollTop: 23 })).toBe(13);
-  });
-
-  it('ignores height changes of the first visible row and the rows below it', () => {
-    const after = rowOffsets([10, 10, 90, 10, 300]);
-    expect(anchoredScrollTop({ before, after, scrollTop: 23 })).toBe(23);
-  });
-
-  it('keeps the top of the table pinned at scroll position 0', () => {
-    const after = rowOffsets([99, 10, 10, 10, 10]);
-    expect(anchoredScrollTop({ before, after, scrollTop: 0 })).toBe(0);
-  });
-
-  it('keeps the scroll position when the row count changed', () => {
-    expect(anchoredScrollTop({ before, after: rowOffsets([50, 50]), scrollTop: 23 })).toBe(23);
   });
 });
 

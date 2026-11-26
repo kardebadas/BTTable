@@ -70,3 +70,20 @@ export function sortEntries<R>(entries: RowEntry<R>[], columns: readonly Column<
   keyed.sort((a, b) => compareValues(a.key, b.key, sort.direction));
   return keyed.map((item) => item.entry);
 }
+
+/** Id → index maps, built on first lookup and kept as long as their list lives. */
+const indexMaps = new WeakMap<readonly RowEntry<unknown>[], Map<RowId, number>>();
+
+/**
+ * Index of the first entry with `id` in `entries`, or -1. The id → index map is built once
+ * per list (O(n)), on the first lookup; every later lookup in that list is O(1).
+ */
+export function indexOfId<R>(entries: readonly RowEntry<R>[], id: RowId): number {
+  let map = indexMaps.get(entries);
+  if (!map) {
+    map = new Map();
+    for (let i = entries.length - 1; i >= 0; i -= 1) map.set(entries[i].id, i);
+    indexMaps.set(entries, map);
+  }
+  return map.get(id) ?? -1;
+}

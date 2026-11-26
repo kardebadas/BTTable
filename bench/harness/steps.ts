@@ -58,8 +58,8 @@ export async function heap({ cdp }: StepContext) {
 /** The `offsetsOf` pass replicated at this n: one entries map + prefix sums. */
 export async function offsetsPass({ page }: StepContext) {
   return page.evaluate(() => {
-    const runs = [0, 1, 2, 3, 4].map(() => window.__bench.offsetsPassMs());
-    return { medianMs: [...runs].sort((a, b) => a - b)[2] };
+    const median = (time: () => number) => [0, 1, 2, 3, 4].map(time).sort((a, b) => a - b)[2];
+    return { medianMs: median(window.__bench.offsetsPassMs), buildMs: median(window.__bench.treeBuildMs) };
   });
 }
 

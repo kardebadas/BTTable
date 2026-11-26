@@ -40,7 +40,7 @@ const COLUMNS_A: [string, (run: RunResult) => string][] = [
   ['drag p50/p95/max ms', (run) => cell(run, 'drag', (v) => (v.skipped ? 'n/a' : frames(v)))],
   ['header drift px', (run) => cell(run, 'wheel', (v) => num(v.headerDriftPx, 1)) + ' / ' + cell(run, 'drag', (v) => (v.skipped ? 'n/a' : num(v.headerDriftPx, 1)))],
   ['RO cb p95/max ms', (run) => cell(run, 'wheel', (v) => `${num((v.resize as Value).p95, 1)} / ${num((v.resize as Value).max, 1)}`)],
-  ['offsets pass ms', (run) => cell(run, 'offsetsPass', (v) => num(v.medianMs, 1))],
+  ['offsets pass ms (per measurement / per list)', (run) => cell(run, 'offsetsPass', (v) => `${num(v.medianMs, 3)} / ${num(v.buildMs, 1)}`)],
 ];
 
 const COLUMNS_B: [string, (run: RunResult) => string][] = [
