@@ -1,0 +1,164 @@
+/*
+ * @kardebadas/bttable stylesheet, part 1 of 3: theme. Every selector is prefixed .btt-.
+ * The published dist/styles.css is theme.css + table.css + controls.css, in that order.
+ *
+ * Theme through the --btt-* custom properties below; set any of them on `.btt` (or on a
+ * class you pass as `className`). Defaults sit inside :where(), so a plain `.btt { ... }`
+ * rule of yours wins. Dark values follow `prefers-color-scheme`; `className="btt-theme-light"`
+ * or `"btt-theme-dark"` forces one scheme. Never set widths on cells: column widths come
+ * from the table's <colgroup> only.
+ */
+
+/* The light defaults also sit on a portalled popover; it gets its table's computed values inline. */
+:where(.btt, .btt-multiselect-popover) {
+  --btt-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --btt-font-size: 0.875rem;
+  --btt-bg: #ffffff;
+  --btt-fg: #1d2733;
+  --btt-surface: #f5f8fb;
+  --btt-border: #d8e0e8;
+  --btt-border-strong: #7d8d9c;
+  --btt-header-bg: #064b8f;
+  --btt-header-fg: #ffffff;
+  --btt-row-alt: #eef5fc;
+  --btt-row-hover: #dcebfa;
+  --btt-accent: #0b6bcb;
+  --btt-danger: #c42b1c;
+  --btt-muted: #5a6876;
+  --btt-radius: 6px;
+  --btt-tone-danger-bg: #fde8e6;
+  --btt-tone-danger-fg: #8c1d12;
+  --btt-tone-warning-bg: #fff3d1;
+  --btt-tone-warning-fg: #6b4500;
+  --btt-tone-success-bg: #e3f5e8;
+  --btt-tone-success-fg: #17592d;
+  --btt-tone-info-bg: #e3f0fc;
+  --btt-tone-info-fg: #0a4a87;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :where(.btt:not(.btt-theme-light)) {
+    --btt-bg: #14181d;
+    --btt-fg: #e2e8ee;
+    --btt-surface: #1b2027;
+    --btt-border: #2d3640;
+    --btt-border-strong: #5f6e7d;
+    --btt-header-bg: #0f3a64;
+    --btt-header-fg: #eaf2fb;
+    --btt-row-alt: #1a2028;
+    --btt-row-hover: #22303f;
+    --btt-accent: #5ea8f0;
+    --btt-danger: #ff7b6e;
+    --btt-muted: #9aa8b6;
+    --btt-tone-danger-bg: #3e1b18;
+    --btt-tone-danger-fg: #ffb4a9;
+    --btt-tone-warning-bg: #3a2c0c;
+    --btt-tone-warning-fg: #ffd88a;
+    --btt-tone-success-bg: #15331f;
+    --btt-tone-success-fg: #9be2b0;
+    --btt-tone-info-bg: #13304c;
+    --btt-tone-info-fg: #a9d2fa;
+    color-scheme: dark;
+  }
+}
+
+:where(.btt.btt-theme-dark) {
+  --btt-bg: #14181d;
+  --btt-fg: #e2e8ee;
+  --btt-surface: #1b2027;
+  --btt-border: #2d3640;
+  --btt-border-strong: #5f6e7d;
+  --btt-header-bg: #0f3a64;
+  --btt-header-fg: #eaf2fb;
+  --btt-row-alt: #1a2028;
+  --btt-row-hover: #22303f;
+  --btt-accent: #5ea8f0;
+  --btt-danger: #ff7b6e;
+  --btt-muted: #9aa8b6;
+  --btt-tone-danger-bg: #3e1b18;
+  --btt-tone-danger-fg: #ffb4a9;
+  --btt-tone-warning-bg: #3a2c0c;
+  --btt-tone-warning-fg: #ffd88a;
+  --btt-tone-success-bg: #15331f;
+  --btt-tone-success-fg: #9be2b0;
+  --btt-tone-info-bg: #13304c;
+  --btt-tone-info-fg: #a9d2fa;
+  color-scheme: dark;
+}
+
+/* Root */
+
+.btt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--btt-font);
+  font-size: var(--btt-font-size);
+  line-height: 1.45;
+  color: var(--btt-fg);
+}
+
+.btt *,
+.btt *::before,
+.btt *::after {
+  box-sizing: border-box;
+}
+
+.btt ::placeholder {
+  color: var(--btt-muted);
+  opacity: 1;
+}
+
+.btt input[type='checkbox'] {
+  accent-color: var(--btt-accent);
+}
+
+.btt :focus-visible {
+  outline: 2px solid var(--btt-accent);
+  outline-offset: 1px;
+}
+
+/* Motion, only when the user has not asked for less */
+
+@media (prefers-reduced-motion: no-preference) {
+  .btt-status--loading::before {
+    animation: btt-spin 0.8s linear infinite;
+  }
+
+  .btt-table tbody {
+    transition: opacity 0.15s ease;
+  }
+
+  .btt-skeleton {
+    background-image: linear-gradient(90deg, transparent, var(--btt-surface), transparent);
+    background-size: 200% 100%;
+    animation: btt-shimmer 1.2s ease-in-out infinite;
+  }
+
+  .btt-row,
+  .btt-export,
+  .btt-retry,
+  .btt-page-prev,
+  .btt-page-next,
+  .btt-multiselect-button {
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+  }
+}
+
+@keyframes btt-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes btt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
