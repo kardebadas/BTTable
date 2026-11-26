@@ -144,3 +144,8 @@ body {
 .demo-detail dd {
   margin: 0;
 }
+
+/* Clips like a card or modal body would, to prove the MultiSelect popover escapes it. */
+.demo-clip {
+  overflow: hidden;
+}

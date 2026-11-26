@@ -1,10 +1,16 @@
 import { useRef, useState } from 'react';
-import { BTTable, type ExportData, type RowId } from '../src';
+import { BTTable, type ExportData, type RowId, type RowTone } from '../src';
 import { COLUMNS, type DemoRow, generateRows } from './data';
 import { HeaderWidths } from './HeaderWidths';
 
 const ROWS = generateRows(5_000, 42);
 const EXPORT_FORMATS = ['json'];
+const STATUS_TONES: Record<string, RowTone> = { Active: 'success', Pending: 'warning', Blocked: 'danger', Archived: 'info' };
+
+/** Tints each row by its status, to show every row tone. */
+function toneOf(row: DemoRow): RowTone | undefined {
+  return STATUS_TONES[row.status];
+}
 
 /** Saves the export payload as a JSON file of objects keyed by header. */
 function downloadJson(format: string, data: ExportData): void {
@@ -43,7 +49,7 @@ export function ClientDemo({ themeClass }: { themeClass?: string }) {
         </label>
         <HeaderWidths target={wrapRef} />
       </div>
-      <div ref={wrapRef}>
+      <div ref={wrapRef} className="demo-clip">
         <BTTable
           columns={COLUMNS}
           rows={ROWS}
@@ -52,6 +58,7 @@ export function ClientDemo({ themeClass }: { themeClass?: string }) {
           selectedIds={selected}
           onSelectionChange={setSelected}
           renderDetail={renderDetail}
+          rowTone={toneOf}
           exportCsv
           exportFileName="bttable-demo.csv"
           exportFormats={EXPORT_FORMATS}
