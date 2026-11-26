@@ -147,6 +147,18 @@ function isNarrowed<R>({ columns, controls }: ControlsInput<R>): boolean {
 }
 
 /**
+ * True when `TopControls` renders anything: a filters panel, or a toolbar part (search,
+ * counter, export buttons, extras). "Clear all" needs search or a filter, so it is covered.
+ */
+export function hasTopControls<R>(props: ControlProps & { columns: readonly Column<R>[] }): boolean {
+  if (props.search !== false || props.showCounter !== false) return true;
+  if (props.columns.some((column) => column.filter !== undefined)) return true;
+  const formats = props.onExport ? (props.exportFormats ?? []) : [];
+  if (props.exportCsv || formats.length > 0) return true;
+  return props.toolbarExtras !== undefined && props.toolbarExtras !== null;
+}
+
+/**
  * The filters panel and the toolbar above the table, each behind an error boundary. Owns the
  * every-row export (`exportAll`): unmounting aborts it.
  */
