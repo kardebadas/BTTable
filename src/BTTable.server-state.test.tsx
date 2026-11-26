@@ -87,7 +87,7 @@ describe('selection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await settle(calls[1], { rows: makeRows(3, 2), totalRows: 4 });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select all' }));
-    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 3, 4]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 3, 4], [...makeRows(1, 1), ...makeRows(3, 2)]);
     fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
     await settle(calls[2], { rows: makeRows(1, 2), totalRows: 4 });
     const boxes = within(container.querySelector('tbody') as HTMLElement).getAllByRole('checkbox');

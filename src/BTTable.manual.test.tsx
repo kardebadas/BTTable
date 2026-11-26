@@ -97,7 +97,7 @@ describe('manual mode: rows, counter and pages', () => {
     const { container } = renderManual({ rows, totalRows: 2, selectable: true, onSelectionChange });
     expect(names(container)).toEqual(['Ana', 'Bo']);
     fireEvent.click(bodyBoxes(container)[1]);
-    expect(onSelectionChange).toHaveBeenLastCalledWith(['b']);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(['b'], [rows.b]);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -166,7 +166,7 @@ describe('manual mode: selection and export', () => {
     fireEvent.click(bodyBoxes(container)[0]);
     rerender({ rows: makeRows(3, 2) });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select all' }));
-    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 3, 4]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 3, 4], [...makeRows(1, 1), ...makeRows(3, 2)]);
   });
 
   it('exports the rows of the current page', () => {

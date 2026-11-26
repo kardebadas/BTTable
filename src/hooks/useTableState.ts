@@ -19,6 +19,8 @@ export type TableActions = {
   /** Empties the search box and applies the empty search at once, without the debounce. */
   clearSearch: () => void;
   setFilter: (key: string, value: FilterValue) => void;
+  /** Empties the search (at once) and every filter, back to page 1, as one reported change. */
+  clearAll: () => void;
   toggleSort: (key: string) => void;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
@@ -47,7 +49,7 @@ function initState<R>(options: TableStateOptions<R>): TableState {
   const filters = options.filters ?? resetFilters(options);
   const sort = options.sort === undefined ? (options.defaultSort ?? null) : options.sort;
   const page = options.page ?? options.defaultPage ?? 1;
-  return { searchInput: search, search, filters, sort, page, pageSize: pageSizeOf(options), resets: 0, proposals: NO_PROPOSALS };
+  return { searchInput: search, search, filters, sort, page, pageSize: pageSizeOf(options), resets: 0, clears: 0, proposals: NO_PROPOSALS };
 }
 
 /**
@@ -178,6 +180,7 @@ function useActions(apply: ApplyAction): TableActions {
         apply({ type: 'applySearch' });
       },
       setFilter: (key: string, value: FilterValue) => apply({ type: 'filter', key, value }),
+      clearAll: () => apply({ type: 'clearAll' }),
       toggleSort: (key: string) => apply({ type: 'sort', key }),
       setPage: (page: number) => apply({ type: 'page', page }),
       setPageSize: (pageSize: number) => apply({ type: 'pageSize', pageSize }),

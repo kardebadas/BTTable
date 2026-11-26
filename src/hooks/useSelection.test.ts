@@ -15,14 +15,14 @@ describe('useSelection', () => {
     expect(result.current.selectedIds).toEqual([2, 3]);
     act(() => result.current.toggleRow(2));
     expect(result.current.selectedIds).toEqual([3]);
-    expect(onSelectionChange.mock.calls).toEqual([[[2, 3]], [[3]]]);
+    expect(onSelectionChange.mock.calls).toEqual([[[2, 3], []], [[3], []]]);
   });
 
   it('is controlled by selectedIds: reports changes and shows only the prop', () => {
     const onSelectionChange = vi.fn();
     const { result, rerender } = setup({ scopeIds: [1, 2], selectedIds: [1], onSelectionChange });
     act(() => result.current.toggleRow(2));
-    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 2]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 2], []);
     expect(result.current.selectedIds).toEqual([1]);
     rerender({ scopeIds: [1, 2], selectedIds: [1, 2], onSelectionChange });
     expect(result.current.allSelected).toBe(true);
@@ -50,7 +50,7 @@ describe('useSelection', () => {
     const props = { scopeIds: [], selectedIds: [1, 2], onSelectionChange };
     const { result, rerender } = setup({ ...props, presentIds: new Set([1, 2]) });
     rerender({ ...props, presentIds: new Set([2]) });
-    expect(onSelectionChange).toHaveBeenCalledWith([2]);
+    expect(onSelectionChange).toHaveBeenCalledWith([2], []);
     expect(result.current.selectedIds).toEqual([1, 2]);
     rerender({ ...props, selectedIds: [2], presentIds: new Set([2]) });
     expect(result.current.selectedIds).toEqual([2]);
@@ -82,7 +82,7 @@ describe('useSelection', () => {
     rerender({ ...props, presentIds: new Set() });
     rerender({ ...props, presentIds: new Set([2]) });
     expect(result.current.selectedIds).toEqual([2]);
-    expect(onSelectionChange).toHaveBeenCalledWith([2]);
+    expect(onSelectionChange).toHaveBeenCalledWith([2], []);
   });
 
   it('composes consecutive toggles in one handler, uncontrolled', () => {
@@ -93,7 +93,7 @@ describe('useSelection', () => {
       result.current.toggleRow(2);
     });
     expect(result.current.selectedIds).toEqual([1, 2]);
-    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 2]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 2], []);
   });
 
   it('composes consecutive toggles in one handler, controlled', () => {
@@ -103,7 +103,7 @@ describe('useSelection', () => {
       result.current.toggleRow(1);
       result.current.toggleAll();
     });
-    expect(onSelectionChange.mock.calls).toEqual([[[3, 1]], [[3, 1, 2]]]);
+    expect(onSelectionChange.mock.calls).toEqual([[[3, 1], []], [[3, 1, 2], []]]);
   });
 
   it('keeps the selection object and its toggles stable across unrelated re-renders', () => {

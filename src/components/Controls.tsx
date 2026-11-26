@@ -1,5 +1,6 @@
 import type { ErrorInfo, ReactNode } from 'react';
 import { toCsv } from '../core/export';
+import { isFilterActive } from '../core/filters';
 import type { CounterData } from '../core/pagination';
 import type { Column, ExportData, FilterState, FilterValue } from '../core/types';
 import type { Selection } from '../hooks/useSelection';
@@ -30,6 +31,8 @@ export type ControlProps = {
   onExport?: (format: string, data: ExportData) => void;
   /** Extra export format names, one toolbar button each, calling `onExport`. Default `[]`. */
   exportFormats?: readonly string[];
+  /** A "Clear all" button, shown while search or any filter is active, that clears both. Default `true`. */
+  clearAll?: boolean;
   /** Caller content placed in the toolbar. */
   toolbarExtras?: ReactNode;
   /**
@@ -40,13 +43,15 @@ export type ControlProps = {
 };
 
 /** State and actions the controls read, whatever the data mode. */
-export type TableControls = {
+export type TableControls<R = unknown> = {
   searchInput: string;
   setSearch: (text: string) => void;
   /** Empties the search and applies it at once, skipping any debounce. */
   clearSearch: () => void;
   filters: FilterState;
   setFilter: (key: string, value: FilterValue) => void;
+  /** Empties the search and every filter at once, back to page 1. */
+  clearAll: () => void;
   page: number;
   pageCount: number;
   pageSize: number;
@@ -56,7 +61,11 @@ export type TableControls = {
   counter: CounterData | null | undefined;
   /** The export payload for every filtered row (server mode: the current page); called on click only. */
   exportData: () => ExportData;
-  selection: Selection;
+  /** Rows the export would hold; with none the export buttons are disabled. */
+  exportRowCount: number;
+  /** Shows the counter's help button: search and filters run on the server, one page shows. */
+  counterHelp?: boolean;
+  selection: Selection<R>;
 };
 
 /** Input of `TopControls` and `FooterControls`. */
@@ -65,6 +74,8 @@ export type ControlsInput<R> = ControlProps & {
   labels: BTTableLabels;
   controls: TableControls;
   pagination?: boolean;
+  /** Disables the export buttons. */
+  loading?: boolean;
   onError?: (error: Error, info: ErrorInfo) => void;
 };
 
@@ -94,7 +105,15 @@ function toolbarActions<R>(props: ControlsInput<R>) {
   return {
     onExportCsv: props.exportCsv ? () => downloadCsv(fileName, toCsv(controls.exportData())) : undefined,
     onExport: onExport && ((format: string) => onExport(format, controls.exportData())),
+    exportDisabled: Boolean(props.loading) || controls.exportRowCount === 0,
+    onClearAll: props.clearAll !== false && isNarrowed(props) ? controls.clearAll : undefined,
   };
+}
+
+/** True while the search box holds text or any column filter is active. */
+function isNarrowed<R>({ columns, controls }: ControlsInput<R>): boolean {
+  if (controls.searchInput !== '') return true;
+  return columns.some((column) => column.filter !== undefined && isFilterActive(column.filter, controls.filters[column.key]));
 }
 
 /** The filters panel and the toolbar above the table, each behind an error boundary. */
@@ -117,6 +136,7 @@ export function TopControls<R>(props: ControlsInput<R>) {
         locale={props.locale}
         search={props.search === false ? undefined : search}
         counter={props.showCounter === false ? undefined : controls.counter}
+        counterHelp={controls.counterHelp}
         exportFormats={props.exportFormats}
         extras={props.toolbarExtras}
         {...toolbarActions(props)}

@@ -10,6 +10,7 @@
 .btt-page-input,
 .btt-page-size select,
 .btt-export,
+.btt-clear-all,
 .btt-retry,
 .btt-page-prev,
 .btt-page-next {
@@ -24,6 +25,7 @@
 }
 
 .btt-export,
+.btt-clear-all,
 .btt-retry,
 .btt-page-prev,
 .btt-page-next {
@@ -33,7 +35,8 @@
   cursor: pointer;
 }
 
-.btt-export:hover,
+.btt-export:hover:not(:disabled),
+.btt-clear-all:hover,
 .btt-retry:hover,
 .btt-page-prev:hover:not(:disabled),
 .btt-page-next:hover:not(:disabled),
@@ -41,6 +44,7 @@
   border-color: var(--btt-accent);
 }
 
+.btt-export:disabled,
 .btt-page-prev:disabled,
 .btt-page-next:disabled {
   opacity: 0.5;
@@ -97,6 +101,70 @@
   margin-right: auto;
   color: var(--btt-muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Counter help: a "?" button and its tooltip bubble */
+
+.btt-counter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+}
+
+.btt-counter-group .btt-counter {
+  margin-right: 0;
+}
+
+.btt-counter-help {
+  position: relative;
+  display: inline-flex;
+}
+
+.btt-counter-help-button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--btt-muted);
+  background-color: var(--btt-surface);
+  border: 1px solid var(--btt-border-strong);
+  border-radius: 50%;
+  cursor: help;
+}
+
+.btt-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 10;
+  width: max-content;
+  max-width: 18rem;
+  padding: 6px 10px;
+  color: var(--btt-bg);
+  background-color: var(--btt-fg);
+  border-radius: var(--btt-radius);
+  transform: translateX(-50%);
+}
+
+.btt-tooltip[hidden] {
+  display: none;
+}
+
+/* Selection bar */
+
+.btt-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: var(--btt-row-hover);
+  border: 1px solid var(--btt-accent);
+  border-radius: var(--btt-radius);
 }
 
 .btt-exports,

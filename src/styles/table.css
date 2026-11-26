@@ -179,6 +179,16 @@
   background-color: color-mix(in srgb, var(--btt-accent) 16%, var(--btt-bg));
 }
 
+/* Skeleton rows while the first rows load (never .btt-row) */
+
+.btt-skeleton {
+  display: block;
+  height: 0.9em;
+  margin: 0.3em 0;
+  background-color: var(--btt-border);
+  border-radius: var(--btt-radius);
+}
+
 .btt-empty {
   padding: 28px 16px;
   text-align: center;

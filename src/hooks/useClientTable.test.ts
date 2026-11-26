@@ -259,7 +259,7 @@ describe('selection', () => {
     const { result } = setup({ onSelectionChange });
     act(() => result.current.setFilter('name', 'b'));
     act(() => result.current.selection.toggleAll());
-    expect(onSelectionChange).toHaveBeenLastCalledWith([2, 5]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([2, 5], [ROWS[1], ROWS[4]]);
     expect(result.current.selection.allSelected).toBe(true);
     act(() => result.current.selection.toggleRow(5));
     expect(result.current.selection.indeterminate).toBe(true);
@@ -271,7 +271,7 @@ describe('selection', () => {
     const { result, rerender } = setup({ defaultSelectedIds: [1, 3], onSelectionChange });
     rerender({ rows: ROWS.slice(1), columns: COLUMNS, onSelectionChange });
     expect(result.current.selection.selectedIds).toEqual([3]);
-    expect(onSelectionChange).toHaveBeenCalledWith([3]);
+    expect(onSelectionChange).toHaveBeenCalledWith([3], [ROWS[2]]);
   });
 
   it('keeps a default selection whose rows have not loaded yet', () => {

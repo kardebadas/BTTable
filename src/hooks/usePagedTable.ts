@@ -3,7 +3,7 @@ import { type CounterData, getCounter, pageCount } from '../core/pagination';
 import { buildQuery, typedFiltersKey } from '../core/query';
 import type { Column, FilterState, Query, SortState } from '../core/types';
 import { buildEntries, type RowEntry, type RowId, type RowSource, sourceSize } from './rowModel';
-import { type Selection, useSelection } from './useSelection';
+import { type Selection, type SelectionChange, useSelection } from './useSelection';
 import { type ApplyAction, DEFAULT_DEBOUNCE_MS, type TableActions, useTableState } from './useTableState';
 import type { ViewStateProps } from './viewState';
 
@@ -21,7 +21,9 @@ export type PagedTableOptions<R> = ViewStateProps & {
   onQueryChange?: (query: Query) => void;
   selectedIds?: readonly RowId[];
   defaultSelectedIds?: readonly RowId[];
-  onSelectionChange?: (ids: RowId[]) => void;
+  onSelectionChange?: SelectionChange<R>;
+  /** The checkbox column; turning it off clears the selection. */
+  selectable?: boolean;
 };
 
 /** One page as the server answered it: a fetch result, or the props of manual mode. */
@@ -51,7 +53,7 @@ export type PagedTable<R> = TableActions & {
   error: boolean;
   /** Sends the current query again. */
   retry: () => void;
-  selection: Selection;
+  selection: Selection<R>;
 };
 
 /** An empty page. */
@@ -103,24 +105,43 @@ function serverPageCount<R>(result: PageResult<R> | null, query: Query): number 
   return full ? query.page + 1 : query.page;
 }
 
-/** The request generation: bumped by `refreshKey`, `resetKey` and Retry, each forcing one request. */
-function useGeneration<R>(options: PagedTableOptions<R>) {
+type ClearsSeen = { clears: number; queryKey: string; landed: number };
+
+/**
+ * How many "Clear all" uses changed the query on screen to a cleared one (no search, no
+ * filters), adjusted during render. A clear is settled in the render that applies it: a
+ * controlled clear counts when the parent echoes it in that render; one that changes
+ * nothing (only unapplied typing to drop) or that the parent rejects never counts, so later
+ * typing stays debounced.
+ */
+function useLandedClears(clears: number, query: Query, queryKey: string): number {
+  const [seen, setSeen] = useState<ClearsSeen>({ clears, queryKey, landed: 0 });
+  if (seen.clears === clears && seen.queryKey === queryKey) return seen.landed;
+  const cleared = query.search === '' && Object.keys(query.filters).length === 0;
+  const lands = seen.clears !== clears && seen.queryKey !== queryKey && cleared;
+  const next = { clears, queryKey, landed: seen.landed + (lands ? 1 : 0) };
+  setSeen(next);
+  return next.landed;
+}
+
+/** The request generation: bumped by `refreshKey`, `resetKey`, Retry and a landed "Clear all", each sent at once. */
+function useGeneration<R>(options: PagedTableOptions<R>, clears: number, query: Query, queryKey: string) {
   const [retries, setRetries] = useState(0);
   const retry = useCallback(() => setRetries((count) => count + 1), []);
-  const generation = useChangeCount(options.refreshKey) + useChangeCount(options.resetKey) + retries;
+  const generation = useChangeCount(options.refreshKey) + useChangeCount(options.resetKey) + useLandedClears(clears, query, queryKey) + retries;
   return { generation, retry };
 }
 
 /**
  * The view state (`useTableState`) as a server `Query`, with the keys that schedule its
  * requests: `queryKey` (the query), `viewKey` (query plus resets), `typedKey` (the
- * debounced part) and `generation` (refresh, reset, retry).
+ * debounced part) and `generation` (refresh, reset, retry, a landed "Clear all").
  */
 export function usePagedQuery<R>(options: PagedTableOptions<R>) {
   const { state, apply, actions } = useTableState(options);
-  const { generation, retry } = useGeneration(options);
   const query = buildQuery(state, options.columns);
   const queryKey = JSON.stringify(query);
+  const { generation, retry } = useGeneration(options, state.clears, query, queryKey);
   const keys = { queryKey, viewKey: `${state.resets}:${queryKey}`, typedKey: typedFiltersKey(query), generation };
   const delay = options.searchDebounceMs ?? DEFAULT_DEBOUNCE_MS;
   return { state, apply, actions, query, keys, delay, retry };
@@ -144,7 +165,7 @@ export function usePageModel<R>(options: PagedTableOptions<R>, paged: PagedQuery
   const pageRows = useMemo(() => buildEntries(rows, getRowId), [rows, getRowId]);
   const scopeIds = useMemo(() => pageRows.map((entry) => entry.id), [pageRows]);
   const { selectedIds, defaultSelectedIds, onSelectionChange } = options;
-  const selection = useSelection({ scopeIds, selectedIds, defaultSelectedIds, onSelectionChange });
+  const selection = useSelection({ scopeIds, selectedIds, defaultSelectedIds, onSelectionChange, entries: pageRows, enabled: Boolean(options.selectable) });
   return {
     ...actions,
     searchInput: state.searchInput,

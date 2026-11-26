@@ -21,6 +21,12 @@ export type BTTableLabels = {
   counterFiltered: string;
   /** Counter text when there are no records. */
   noRecords: string;
+  /** Server and manual mode: what the counter's help button explains. */
+  counterHelp: string;
+  /** Accessible name of the counter's help button. */
+  counterHelpButton: string;
+  /** Text of the toolbar button that clears search and every filter. */
+  clearAll: string;
   /** Text of the CSV export button. */
   exportCsv: string;
   /** Text of each `exportFormats` button; `{format}` is the format name in upper case. */
@@ -68,6 +74,9 @@ export const DEFAULT_LABELS: Readonly<BTTableLabels> = Object.freeze({
   counter: 'Showing {from}–{to} of {total}',
   counterFiltered: '(filtered from {total})',
   noRecords: 'No records',
+  counterHelp: 'Search and filters run on the whole dataset; one page is shown at a time.',
+  counterHelpButton: 'About the counter',
+  clearAll: 'Clear all',
   exportCsv: 'CSV',
   exportFormat: '{format}',
   pagination: 'Pagination',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mergeChanges, NO_PROPOSALS, type TableState } from './tableReducer';
 
-const STATE: TableState = { searchInput: '', search: '', filters: {}, sort: null, page: 1, pageSize: 10, resets: 0, proposals: NO_PROPOSALS };
+const STATE: TableState = { searchInput: '', search: '', filters: {}, sort: null, page: 1, pageSize: 10, resets: 0, clears: 0, proposals: NO_PROPOSALS };
 
 describe('mergeChanges', () => {
   it('takes only the fields that changed between from and to', () => {

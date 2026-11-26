@@ -4,7 +4,7 @@ import type { Column, FilterState, SortState } from '../core/types';
 import { buildEntries, filterEntries, type RowEntry, type RowId, type RowSource, sortEntries } from './rowModel';
 import type { TableState } from './tableReducer';
 import { useLatest } from './useLatest';
-import { type Selection, useSelection } from './useSelection';
+import { type Selection, type SelectionChange, useSelection } from './useSelection';
 import { type ApplyAction, type TableActions, useTableState } from './useTableState';
 import type { ViewStateProps } from './viewState';
 
@@ -33,7 +33,9 @@ export type UseClientTableOptions<R> = ViewStateProps & {
   onStateChange?: (state: ClientTableState<R>) => void;
   selectedIds?: readonly RowId[];
   defaultSelectedIds?: readonly RowId[];
-  onSelectionChange?: (ids: RowId[]) => void;
+  onSelectionChange?: SelectionChange<R>;
+  /** The checkbox column; turning it off clears the selection. */
+  selectable?: boolean;
 };
 
 /** Client table state, derived rows and actions, as consumed by the table components. */
@@ -59,7 +61,7 @@ export type ClientTable<R> = TableActions & {
   filteredRows: RowEntry<R>[];
   /** The rows of the current page (all filtered rows when pagination is off). */
   pageRows: RowEntry<R>[];
-  selection: Selection;
+  selection: Selection<R>;
 };
 
 function sameState<R>(a: ClientTableState<R>, b: ClientTableState<R>): boolean {
@@ -121,7 +123,7 @@ export function useClientTable<R>(options: UseClientTableOptions<R>): ClientTabl
   const presentIds = useMemo(() => new Set(entries.map((entry) => entry.id)), [entries]);
   const scopeIds = useMemo(() => sorted.map((entry) => entry.id), [sorted]);
   const { selectedIds, defaultSelectedIds, onSelectionChange } = options;
-  const selection = useSelection({ scopeIds, presentIds, selectedIds, defaultSelectedIds, onSelectionChange });
+  const selection = useSelection({ scopeIds, presentIds, selectedIds, defaultSelectedIds, onSelectionChange, entries, enabled: Boolean(options.selectable) });
 
   return {
     ...actions,

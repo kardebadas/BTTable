@@ -210,7 +210,8 @@ or the load error has the class `btt-empty-row` instead.
 | `search` | `true` | Show the global search box (with a clear button). |
 | `searchPlaceholder` | `'Search…'` | Placeholder of the search box. |
 | `searchDebounceMs` | `250` | Quiet time before typed search applies. In server mode it also delays typed `text`, `number` and `date` filters. |
-| `showCounter` | `true` | "Showing 1–100 of 2,345", plus "(filtered from 50,000)" when filtering hid rows, or "No records". |
+| `showCounter` | `true` | "Showing 1–100 of 2,345", plus "(filtered from 50,000)" when filtering hid rows, or "No records". In server and manual mode a small "?" button next to it explains that search and filters run on the whole dataset and one page shows (the `counterHelp` label, in a tooltip on hover or focus; Escape closes it). |
+| `clearAll` | `true` | A "Clear all" button, shown while the search box holds text or any filter is active: it empties both at once (no debounce; server and manual mode send the cleared query at once) and returns to page 1, reported through `onSearchChange`, `onFiltersChange` and `onPageChange`. Filters go to empty, not to their defaults (that is `resetKey`). `false` hides it. The search box's own × clears the search only. |
 | `pagination` | `true` | Client mode: `false` shows every filtered row in one scroll (virtualized). Server mode always paginates; `false` is ignored with a development warning. |
 | `pageSize` | `100` | Initial page size. Changing the prop resyncs the table. |
 | `pageSizeOptions` | `[25, 50, 100, 500]` | Choices of the page-size select; positive whole numbers only. The current size is added when missing. |
@@ -247,14 +248,17 @@ each callback fires on every change the table makes, controlled or not.
 | `exportFormats` | `[]` | Extra format names (e.g. `['pdf', 'xlsx']`): one button each, shown only with `onExport`, labelled by the `exportFormat` label (default: the name in upper case). |
 | `onExport` | – | `(format, data) => void`, called by the `exportFormats` buttons; see [Export](#export). |
 
+Export buttons are disabled while loading and when there is no row to export.
+
 ### Selection
 
 | Prop | Default | Meaning |
 | --- | --- | --- |
-| `selectable` | `false` | Adds a checkbox column with a select-all box in the header. |
+| `selectable` | `false` | Adds a checkbox column with a select-all box in the header. Turning it off clears the selection (reported once). |
 | `selectedIds` | – | Controlled selection (array of row ids). |
 | `defaultSelectedIds` | – | Initial selection when uncontrolled. |
-| `onSelectionChange` | – | `(ids) => void` after every change. |
+| `onSelectionChange` | – | `(ids, rows) => void` after every change; `rows` are the selected rows the table knows (see [Selection](#selection)). |
+| `renderSelectionBar` | – | `({ selectedIds, selectedRows, clear }) => node`: a bar between the toolbar and the table, shown while at least one row is selected. |
 
 ### Layout and state
 
@@ -265,7 +269,7 @@ each callback fires on every change the table makes, controlled or not.
 | `virtualizeThreshold` | `100` | Displayed-row count above which `'auto'` virtualizes. |
 | `estimatedRowHeight` | `40` | Px assumed for a row until it is measured. |
 | `loading` | `false` | Shows "Loading…" in the status strip, dims the rows and sets `aria-busy`, without unmounting rows or moving the layout. In server mode the table also sets it while a request is in flight. |
-| `emptyMessage` | `'No records found'` | Any React node, shown when no row matches (hidden while loading). |
+| `emptyMessage` | `'No records found'` | Any React node, shown when no row matches. While loading with no rows, skeleton rows (the page size, at most 8) show instead, so the layout does not jump. |
 | `caption` | – | Visually hidden `<caption>` naming the table for assistive technology. |
 | `showTableHeader` | `true` | `false` renders no `<thead>`: no sort buttons and no select-all box (row checkboxes stay). Column widths still come from `columns`. |
 | `className` | – | Extra class on the root `.btt` element. |
@@ -534,7 +538,33 @@ shows an indeterminate state for a partial selection, and toggles:
 Use `selectedIds` + `onSelectionChange` for controlled selection, or `defaultSelectedIds` for
 uncontrolled. In client mode a selected id whose row disappears from `rows` is dropped from
 the selection (not when `rows` becomes empty). In server mode ids on other pages are never pruned (those rows are not
-loaded), so clear stale ids yourself through a controlled `selectedIds`.
+loaded), so clear stale ids yourself through a controlled `selectedIds`. Turning `selectable`
+off clears the selection: uncontrolled, the table empties it; controlled, it calls
+`onSelectionChange([], [])` once.
+
+`onSelectionChange(ids, rows)` also hands you the selected **rows** the table knows, in
+selection order: in client mode every selected row (filtered-out ones included); in server and
+manual mode the rows of any page seen while they were selected (kept for selected ids only).
+An id the table never saw selected — e.g. one set through `selectedIds` for a page not loaded —
+has no row.
+
+`renderSelectionBar` puts your bulk actions between the toolbar and the table while at least
+one row is selected:
+
+```tsx
+<BTTable
+  columns={columns}
+  rows={rows}
+  selectable
+  renderSelectionBar={({ selectedIds, selectedRows, clear }) => (
+    <>
+      {selectedIds.length} selected
+      <button onClick={() => archive(selectedRows)}>Archive</button>
+      <button onClick={clear}>Clear</button>
+    </>
+  )}
+/>;
+```
 
 ## Export
 
@@ -608,6 +638,9 @@ runtime locale). `DEFAULT_LABELS` (exported, frozen) holds the English defaults.
 | `counter` | `Showing {from}–{to} of {total}` |
 | `counterFiltered` | `(filtered from {total})` |
 | `noRecords` | `No records` |
+| `counterHelp` | `Search and filters run on the whole dataset; one page is shown at a time.` |
+| `counterHelpButton` | `About the counter` |
+| `clearAll` | `Clear all` |
 | `exportCsv` | `CSV` |
 | `exportFormat` | `{format}` (the `exportFormats` name in upper case) |
 | `pagination` | `Pagination` |
@@ -678,7 +711,10 @@ Do not give `th`/`td` widths of your own: column widths come from `columns` only
   accessible name from `headerText`.
 - Row and select-all checkboxes are labelled ("Select row", "Select all").
 - `aria-busy` is set on the table while loading; the status strip is
-  `role="status" aria-live="polite"`.
+  `role="status" aria-live="polite"`. Skeleton rows are hidden from assistive technology,
+  and their shimmer runs only without `prefers-reduced-motion: reduce`.
+- The server-mode counter's "?" button is described by its `role="tooltip"` bubble
+  (`aria-describedby`); it opens on hover and focus and Escape closes it.
 - The table sets `aria-rowcount` and every row its `aria-rowindex`, so positions stay right
   when rows are virtualized; spacer rows are hidden from assistive technology. With
   `showTableHeader={false}` no header row is counted (the first body row is 1).
@@ -716,7 +752,7 @@ error tints (without them, no tint).
 ## Other exports
 
 Besides `BTTable` and its types (`BTTableProps`, `BTTableClientProps`, `BTTableServerProps`,
-`BTTableCommonProps`, `Column`, `CellContext`, `FilterSpec`,
+`BTTableCommonProps`, `SelectionBarContext`, `Column`, `CellContext`, `FilterSpec`,
 `FilterState`, `FilterValue`, `Option`, `TextOp`, `NumberOp`, `DateOp`, `SortState`, `Query`,
 `FetchResult`, `FetchRows`, `ExportData`, `RowId`, `RowSource`, `CellHandler`, `RowAttributes`, `ClientTableState`,
 `BTTableLabels`, `VirtualizeMode`), the package exports `DEFAULT_LABELS` and the helpers it

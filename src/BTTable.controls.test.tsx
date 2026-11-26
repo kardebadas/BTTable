@@ -214,7 +214,7 @@ describe('selection column', () => {
     const rowBoxes = screen.getAllByRole('checkbox', { name: 'Select row' });
     expect(rowBoxes).toHaveLength(3);
     await user.click(rowBoxes[1]);
-    expect(onSelectionChange).toHaveBeenLastCalledWith([2]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([2], [ROWS[1]]);
     expect(rowBoxes[1]).toBeChecked();
     expect(onClick).not.toHaveBeenCalled();
     expect(screen.getByRole('checkbox', { name: 'Select all' })).toBePartiallyChecked();
@@ -226,11 +226,11 @@ describe('selection column', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'State' }), 'ny');
     const all = screen.getByRole('checkbox', { name: 'Select all' });
     await user.click(all);
-    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 3]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([1, 3], [ROWS[0], ROWS[2]]);
     expect(all).toBeChecked();
     expect(all).not.toBePartiallyChecked();
     await user.click(all);
-    expect(onSelectionChange).toHaveBeenLastCalledWith([]);
+    expect(onSelectionChange).toHaveBeenLastCalledWith([], []);
   });
 
   it('keeps the header box partly checked when a controlled owner rejects select-all', async () => {
@@ -239,7 +239,7 @@ describe('selection column', () => {
     const all = screen.getByRole('checkbox', { name: 'Select all' });
     expect(all).toBePartiallyChecked();
     await user.click(all);
-    expect(onSelectionChange).toHaveBeenCalledWith([1, 2, 3]);
+    expect(onSelectionChange).toHaveBeenCalledWith([1, 2, 3], ROWS);
     expect(all).not.toBeChecked();
     expect(all).toBePartiallyChecked();
   });

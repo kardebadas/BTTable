@@ -1,6 +1,7 @@
-import { type ReactNode, useRef } from 'react';
+import { type MouseEvent, type ReactNode, useRef } from 'react';
 import type { CounterData } from '../core/pagination';
 import { type BTTableLabels, fillLabel, formatCount } from '../labels';
+import { CounterHelp } from './CounterHelp';
 
 /** The search box state of the `Toolbar`. */
 export type ToolbarSearch = {
@@ -19,10 +20,16 @@ export type ToolbarProps = {
   search?: ToolbarSearch;
   /** Counter data; `null` shows "No records", `undefined` hides the counter. */
   counter?: CounterData | null;
+  /** A "?" help button next to the counter (server and manual mode). */
+  counterHelp?: boolean;
+  /** The "Clear all" button: shown only when given. */
+  onClearAll?: () => void;
   onExportCsv?: () => void;
   /** Extra export format names, one button each; shown only with `onExport`. */
   exportFormats?: readonly string[];
   onExport?: (format: string) => void;
+  /** Disables every export button (nothing to export, or loading). */
+  exportDisabled?: boolean;
   extras?: ReactNode;
 };
 
@@ -65,18 +72,18 @@ function SearchBox({ value, placeholder, onChange, onClear, labels }: ToolbarSea
   );
 }
 
-function ExportButtons({ labels, onExportCsv, exportFormats, onExport }: ToolbarProps) {
+function ExportButtons({ labels, onExportCsv, exportFormats, onExport, exportDisabled = false }: ToolbarProps) {
   const formats = onExport ? (exportFormats ?? []) : [];
   if (!onExportCsv && formats.length === 0) return null;
   return (
     <div className="btt-exports">
       {onExportCsv && (
-        <button type="button" className="btt-export btt-export--csv" onClick={onExportCsv}>
+        <button type="button" className="btt-export btt-export--csv" disabled={exportDisabled} onClick={onExportCsv}>
           {labels.exportCsv}
         </button>
       )}
       {formats.map((format) => (
-        <button key={format} type="button" className={`btt-export btt-export--${format}`} onClick={() => onExport?.(format)}>
+        <button key={format} type="button" className={`btt-export btt-export--${format}`} disabled={exportDisabled} onClick={() => onExport?.(format)}>
           {fillLabel(labels.exportFormat, { format: format.toUpperCase() })}
         </button>
       ))}
@@ -84,23 +91,58 @@ function ExportButtons({ labels, onExportCsv, exportFormats, onExport }: Toolbar
   );
 }
 
-function isEmpty({ search, counter, onExportCsv, exportFormats, onExport, extras }: ToolbarProps): boolean {
-  const hasExports = Boolean(onExportCsv) || (Boolean(onExport) && (exportFormats ?? []).length > 0);
-  return !search && counter === undefined && !hasExports && (extras === undefined || extras === null);
+function hasExports({ onExportCsv, exportFormats, onExport }: ToolbarProps): boolean {
+  return Boolean(onExportCsv) || (Boolean(onExport) && (exportFormats ?? []).length > 0);
+}
+
+function isEmpty(props: ToolbarProps): boolean {
+  const { search, counter, onClearAll, extras } = props;
+  const hasExtras = extras !== undefined && extras !== null;
+  return !search && !onClearAll && counter === undefined && !hasExports(props) && !hasExtras;
 }
 
 /**
- * The toolbar above the table: search box with a clear button, record counter, CSV and
- * extra export buttons, and caller extras. Presentational: state comes in as props and
+ * The "Clear all" button. It disappears once nothing is left to clear, so it moves focus
+ * to the search box, else to the toolbar, instead of letting it drop to the page.
+ */
+function ClearAllButton({ label, onClearAll }: { label: string; onClearAll: () => void }) {
+  const click = (event: MouseEvent<HTMLButtonElement>) => {
+    const toolbar = event.currentTarget.closest<HTMLElement>('.btt-toolbar');
+    onClearAll();
+    (toolbar?.querySelector<HTMLElement>('.btt-search-input') ?? toolbar)?.focus();
+  };
+  return (
+    <button type="button" className="btt-clear-all" onClick={click}>
+      {label}
+    </button>
+  );
+}
+
+/** The record counter, with its help button when asked for. */
+function Counter({ counter, labels, locale, help }: { counter: CounterData | null; labels: BTTableLabels; locale?: string; help: boolean }) {
+  const text = <span className="btt-counter">{formatCounter(counter, labels, locale)}</span>;
+  if (!help) return text;
+  return (
+    <span className="btt-counter-group">
+      {text}
+      <CounterHelp labels={labels} />
+    </span>
+  );
+}
+
+/**
+ * The toolbar above the table: search box with a clear button, "Clear all", record counter
+ * (with its help button), CSV and extra export buttons, and caller extras. Presentational: state comes in as props and
  * every action goes out through a callback, whatever the data mode.
  */
 export function Toolbar(props: ToolbarProps) {
   if (isEmpty(props)) return null;
-  const { labels, locale, search, counter, extras } = props;
+  const { labels, locale, search, counter, onClearAll, extras } = props;
   return (
-    <div className="btt-toolbar">
+    <div className="btt-toolbar" tabIndex={-1}>
       {search && <SearchBox {...search} labels={labels} />}
-      {counter !== undefined && <span className="btt-counter">{formatCounter(counter, labels, locale)}</span>}
+      {onClearAll && <ClearAllButton label={labels.clearAll} onClearAll={onClearAll} />}
+      {counter !== undefined && <Counter counter={counter} labels={labels} locale={locale} help={Boolean(props.counterHelp)} />}
       <ExportButtons {...props} />
       {extras !== undefined && extras !== null && <div className="btt-toolbar-extras">{extras}</div>}
     </div>

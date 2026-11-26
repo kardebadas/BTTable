@@ -29,7 +29,7 @@ type ViewProps<R> = ContentProps<R> & {
   sort: SortState;
   onSort: (key: string) => void;
   /** Toolbar, filters, footer and selection state; without it only the table renders. */
-  controls?: TableControls;
+  controls?: TableControls<R>;
 };
 
 /** The status strip always keeps one line of height, so loading never shifts the table. */
@@ -79,6 +79,14 @@ function selectionControls<R>({ controls, selectable, labels }: ViewProps<R>) {
   };
 }
 
+const MAX_SKELETON_ROWS = 8;
+
+/** Skeleton rows while the first rows load: the page size, at most 8. */
+function skeletonCount(pageSize: number | undefined): number {
+  if (pageSize === undefined || !(pageSize > 0)) return MAX_SKELETON_ROWS;
+  return Math.min(Math.floor(pageSize), MAX_SKELETON_ROWS);
+}
+
 /** The body shown when rendering the rows fails. */
 function bodyFallback<R>({ columns, selectable, labels, tbodyClassName }: ViewProps<R>) {
   return (
@@ -104,7 +112,8 @@ function TableScroll<R>(props: ViewProps<R>) {
   // Virtualization keeps the view anchored itself, so the browser's scroll anchoring must not also adjust it.
   const scrollStyle = { overflow: 'auto', scrollbarGutter: 'stable', maxHeight: toCssSize(maxHeight), overflowAnchor: enabled ? 'none' : undefined } as const;
   const head = { columns, sort: props.sort, onSort: props.onSort, selectable, selectAll, className: props.theadClassName };
-  const body = { entries, columns, selectable, loading, emptyMessage, range, selection: rowSelection, headerRows };
+  const skeletonRows = skeletonCount(props.controls?.pageSize);
+  const body = { entries, columns, selectable, loading, emptyMessage, range, selection: rowSelection, headerRows, skeletonRows };
   return (
     <div className="btt-scroll" style={scrollStyle} ref={scrollRef}>
       <table className={cx('btt-table', props.tableClassName)} style={tableStyle} aria-busy={loading} aria-rowcount={entries.length + headerRows}>
@@ -119,12 +128,21 @@ function TableScroll<R>(props: ViewProps<R>) {
   );
 }
 
+/** The `renderSelectionBar` bar, while the table is selectable and at least one row is selected. */
+function SelectionBar<R>({ controls, selectable, renderSelectionBar }: ViewProps<R>) {
+  if (!controls || !selectable || !renderSelectionBar) return null;
+  const { selectedIds, selectedRows, clear } = controls.selection;
+  if (selectedIds.length === 0) return null;
+  return <div className="btt-selection-bar">{renderSelectionBar({ selectedIds: [...selectedIds], selectedRows, clear })}</div>;
+}
+
 function TableView<R>(props: ViewProps<R>) {
   const { controls } = props;
   const loading = props.loading ?? false;
   return (
     <>
       {controls && <TopControls {...props} controls={controls} />}
+      <SelectionBar {...props} />
       <div className={cx('btt-status', loading && 'btt-status--loading')} style={STATUS_STYLE} role="status" aria-live="polite">
         {loading ? props.labels.loading : null}
       </div>
@@ -135,7 +153,7 @@ function TableView<R>(props: ViewProps<R>) {
 }
 
 /** Controls of client mode: the counter over the filtered rows, and every filtered row for export. */
-function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): TableControls {
+function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): TableControls<R> {
   const counter = getCounter({
     page: table.page,
     pageSize: props.pagination === false ? 0 : table.pageSize,
@@ -143,7 +161,7 @@ function clientControls<R>(table: ClientTableModel<R>, props: ContentProps<R>): 
     unfilteredTotal: table.totalRows,
   });
   const exportData = () => buildExportData(props.columns, table.filteredRows.map((entry) => entry.row));
-  return { ...table, counter, exportData };
+  return { ...table, counter, exportData, exportRowCount: table.filteredRows.length };
 }
 
 function ClientTable<R>(props: ContentProps<R> & { rows: RowSource<R> }) {
@@ -170,9 +188,9 @@ function LoadError({ labels, onRetry }: { labels: BTTableLabels; onRetry: () => 
  * Controls of server and manual mode. Export (CSV and `onExport`) covers the rows of the
  * current page only: the other pages live on the server.
  */
-function serverControls<R>(table: PagedTable<R>, props: ContentProps<R>): TableControls {
+function serverControls<R>(table: PagedTable<R>, props: ContentProps<R>): TableControls<R> {
   const exportData = () => buildExportData(props.columns, table.pageRows.map((entry) => entry.row));
-  return { ...table, exportData };
+  return { ...table, exportData, exportRowCount: table.pageRows.length, counterHelp: true };
 }
 
 /** Logs `message` once per mount, in development, the first time `condition` holds. */

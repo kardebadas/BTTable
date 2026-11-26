@@ -31,7 +31,7 @@ describe('rows as an object map', () => {
     const { container } = setup({ rows, selectable: true, onSelectionChange });
     expect(bodyRows(container).map((row) => row.textContent)).toEqual(['Bruno', 'Ana', 'Carla']);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select all' }));
-    expect(onSelectionChange).toHaveBeenLastCalledWith(['b', 7, 'c']);
+    expect(onSelectionChange).toHaveBeenLastCalledWith(['b', 7, 'c'], [rows.b, rows.a, rows.c]);
   });
 
   it('passes the map position to getRowId and rowClassName', () => {

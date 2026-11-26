@@ -1,9 +1,13 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
-import type { RowId } from './rowModel';
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
+import type { RowEntry, RowId } from './rowModel';
 import { useLatest } from './useLatest';
+import { resolveRows, rowsInOrder, useSelectedRows } from './useSelectedRows';
+
+/** Called after every selection change with the ids and the selected rows the table knows. */
+export type SelectionChange<R> = (ids: RowId[], rows: R[]) => void;
 
 /** Input of `useSelection`. */
-export type SelectionOptions = {
+export type SelectionOptions<R = unknown> = {
   /** Ids the select-all box covers: the filtered rows (client) or the current page (server). */
   scopeIds: readonly RowId[];
   /**
@@ -16,12 +20,20 @@ export type SelectionOptions = {
   selectedIds?: readonly RowId[];
   /** Initial uncontrolled selection. */
   defaultSelectedIds?: readonly RowId[];
-  onSelectionChange?: (ids: RowId[]) => void;
+  onSelectionChange?: SelectionChange<R>;
+  /** The rows the table can see now (client: every row; server: the page), for `selectedRows`. Default none. */
+  entries?: readonly RowEntry<R>[];
+  /** The checkbox column is on. Turning it off clears the selection, reported once. Default true. */
+  enabled?: boolean;
 };
 
-/** Row selection: the selected ids, toggles, and the select-all box state. */
-export type Selection = {
+/** Row selection: the selected ids and rows, toggles, and the select-all box state. */
+export type Selection<R = unknown> = {
   selectedIds: readonly RowId[];
+  /** The selected rows the table knows, in selection order; ids never seen have none. */
+  selectedRows: R[];
+  /** Unselects every row. */
+  clear: () => void;
   isSelected: (id: RowId) => boolean;
   toggleRow: (id: RowId) => void;
   toggleAll: () => void;
@@ -64,62 +76,107 @@ function toggleAllIds(selected: readonly RowId[], scopeIds: readonly RowId[]): R
   return selected.filter((id) => !scope.has(id));
 }
 
+/** Reports a selection to `onSelectionChange`, with the rows the table knows for it. */
+type Report = (ids: readonly RowId[]) => void;
+
 type ActionsInput = {
   controlled: boolean;
   setInternal: Dispatch<SetStateAction<readonly RowId[]>>;
-  onChangeRef: Ref<SelectionOptions['onSelectionChange']>;
+  report: Report;
   latestRef: Ref<readonly RowId[]>;
   scopeRef: Ref<readonly RowId[]>;
 };
 
 /** Stable toggles built from the latest selection, so consecutive calls in one handler compose. */
-function useSelectionActions({ controlled, setInternal, onChangeRef, latestRef, scopeRef }: ActionsInput) {
+function useSelectionActions({ controlled, setInternal, report, latestRef, scopeRef }: ActionsInput) {
   return useMemo(() => {
     const commit = (next: RowId[]) => {
       latestRef.current = next;
       if (!controlled) setInternal(next);
-      onChangeRef.current?.(next);
+      report(next);
     };
     const toggleRow = (id: RowId) => {
       const current = latestRef.current;
       commit(current.includes(id) ? current.filter((other) => other !== id) : [...current, id]);
     };
     const toggleAll = () => commit(toggleAllIds(latestRef.current, scopeRef.current));
-    return { toggleRow, toggleAll };
-  }, [controlled, setInternal, onChangeRef, latestRef, scopeRef]);
+    const clear = () => commit([]);
+    return { toggleRow, toggleAll, clear };
+  }, [controlled, setInternal, report, latestRef, scopeRef]);
 }
 
-/**
- * Controlled or uncontrolled row selection. `toggleAll` selects every id in scope (or
- * clears them when all are selected) and keeps selections outside it. Vanished ids are
- * pruned (see `presentIds`) and the drop is reported through `onSelectionChange`. The
- * returned object and its toggles keep their identity until the selection or scope changes.
- */
-export function useSelection(options: SelectionOptions): Selection {
-  const { scopeIds, presentIds, selectedIds } = options;
-  const [internal, setInternal] = useState<readonly RowId[]>(() => options.defaultSelectedIds ?? []);
-  const controlled = selectedIds !== undefined;
-  const source = selectedIds ?? internal;
-  const pruned = usePruneVanished({ source, presentIds, controlled, setInternal });
-  const onChange = useLatest(options.onSelectionChange);
-  useEffect(() => {
-    if (pruned) onChange.current?.([...pruned]);
-  }, [pruned, onChange]);
+type DisableInput = Omit<PruneInput, 'presentIds'> & { enabled: boolean };
 
-  const latest = useLatest(source);
-  const scope = useLatest(scopeIds);
-  const { toggleRow, toggleAll } = useSelectionActions({
-    controlled,
-    setInternal,
-    onChangeRef: onChange,
-    latestRef: latest,
-    scopeRef: scope,
-  });
+/**
+ * Empties a non-empty selection when `enabled` turns off, adjusting state during render;
+ * returns the emptied list (or `null`) for the notifying effect.
+ */
+function useClearOnDisable({ enabled, source, controlled, setInternal }: DisableInput): readonly RowId[] | null {
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  const [cleared, setCleared] = useState<readonly RowId[] | null>(null);
+  if (enabled === wasEnabled) return cleared;
+  setWasEnabled(enabled);
+  if (enabled || source.length === 0) return cleared;
+  if (!controlled) setInternal([]);
+  const next: readonly RowId[] = [];
+  setCleared(next);
+  return next;
+}
+
+/** Calls `onSelectionChange` with the rows known in the latest render, so effects and handlers read fresh rows. */
+function useReporter<R>(onChange: SelectionChange<R> | undefined, rows: ReturnType<typeof useSelectedRows<R>>): Report {
+  const onChangeRef = useLatest(onChange);
+  const rowsRef = useLatest(rows);
+  return useCallback(
+    (ids: readonly RowId[]) => {
+      const { known, cache } = rowsRef.current;
+      onChangeRef.current?.([...ids], rowsInOrder(ids, resolveRows(ids, known, cache)));
+    },
+    [onChangeRef, rowsRef],
+  );
+}
+
+/** Reports `ids` after commit each time a new list arrives. */
+function useNotify(ids: readonly RowId[] | null, report: Report): void {
+  useEffect(() => {
+    if (ids) report(ids);
+  }, [ids, report]);
+}
+
+/** The selected and select-all state of the ids in `source` against `scopeIds`. */
+function useSelectionView<R>(source: readonly RowId[], scopeIds: readonly RowId[], cache: ReadonlyMap<RowId, R>) {
   const selectedSet = useMemo(() => new Set(source), [source]);
   return useMemo(() => {
     const allSelected = scopeIds.length > 0 && scopeIds.every((id) => selectedSet.has(id));
     const indeterminate = !allSelected && scopeIds.some((id) => selectedSet.has(id));
     const isSelected = (id: RowId) => selectedSet.has(id);
-    return { selectedIds: source, isSelected, toggleRow, toggleAll, allSelected, indeterminate };
-  }, [source, scopeIds, selectedSet, toggleRow, toggleAll]);
+    return { selectedIds: source, selectedRows: rowsInOrder(source, cache), isSelected, allSelected, indeterminate };
+  }, [source, scopeIds, selectedSet, cache]);
+}
+
+const NO_ENTRIES: never[] = [];
+
+/**
+ * Controlled or uncontrolled row selection. `toggleAll` selects every id in scope (or
+ * clears them when all are selected) and keeps selections outside it. Vanished ids are
+ * pruned (see `presentIds`), and turning `enabled` off clears the selection; both are
+ * reported through `onSelectionChange`. The returned object and its actions keep their
+ * identity until the selection, scope or known rows change.
+ */
+export function useSelection<R = unknown>(options: SelectionOptions<R>): Selection<R> {
+  const { scopeIds, presentIds, selectedIds } = options;
+  const [internal, setInternal] = useState<readonly RowId[]>(() => options.defaultSelectedIds ?? []);
+  const controlled = selectedIds !== undefined;
+  const source = selectedIds ?? internal;
+  const pruned = usePruneVanished({ source, presentIds, controlled, setInternal });
+  const cleared = useClearOnDisable({ enabled: options.enabled ?? true, source, controlled, setInternal });
+  const rows = useSelectedRows(source, options.entries ?? NO_ENTRIES);
+  const report = useReporter(options.onSelectionChange, rows);
+  useNotify(pruned, report);
+  useNotify(cleared, report);
+  const latestRef = useLatest(source);
+  const scopeRef = useLatest(scopeIds);
+  const actions = useSelectionActions({ controlled, setInternal, report, latestRef, scopeRef });
+  const view = useSelectionView(source, scopeIds, rows.cache);
+  return useMemo(() => ({ ...view, ...actions }), [view, actions]);
 }

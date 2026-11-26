@@ -5,8 +5,12 @@ import type { Column, FetchRows, Query } from './core/types';
 import type { VirtualizeMode } from './core/virtual';
 import type { RowId, RowSource } from './hooks/rowModel';
 import type { ClientTableState } from './hooks/useClientTable';
+import type { SelectionChange } from './hooks/useSelection';
 import type { ViewStateProps } from './hooks/viewState';
 import type { BTTableLabels } from './labels';
+
+/** What `renderSelectionBar` receives. */
+export type SelectionBarContext<R> = { selectedIds: RowId[]; selectedRows: R[]; clear: () => void };
 
 /** Props of `BTTable` shared by every data mode. */
 export type BTTableCommonProps<R> = RowCallbacks<R> &
@@ -42,12 +46,22 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
   /**
    * Checkbox column. In server and manual mode select-all covers the current page, and selected ids
    * are never pruned (rows on other pages are not loaded): clear stale ids through a
-   * controlled `selectedIds`.
+   * controlled `selectedIds`. Turning it off clears the selection (reported once).
    */
   selectable?: boolean;
   selectedIds?: readonly RowId[];
   defaultSelectedIds?: readonly RowId[];
-  onSelectionChange?: (ids: RowId[]) => void;
+  /**
+   * Called after every selection change with the ids and the selected rows the table knows:
+   * client mode every selected row (filtered-out ones included); server and manual mode the
+   * rows of any page seen while selected. Ids never seen have no row.
+   */
+  onSelectionChange?: SelectionChange<R>;
+  /**
+   * A bar between the toolbar and the table, shown while at least one row is selected
+   * (`selectable` only): `clear` unselects every row.
+   */
+  renderSelectionBar?: (ctx: SelectionBarContext<R>) => ReactNode;
   /** Number px or CSS size; `'none'` turns the inner vertical scroll and virtualization off. Default 600. */
   maxHeight?: number | string;
   /** Mount only the rows near the viewport: `'auto'` (default) above `virtualizeThreshold` rows, `true`, `false`. */

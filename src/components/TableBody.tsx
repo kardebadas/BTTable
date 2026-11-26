@@ -116,7 +116,45 @@ export type TableBodyProps<R> = RowCallbacks<R> & {
   headerRows?: number;
   /** Extra class on the `<tbody>`. */
   className?: string;
+  /** Placeholder rows drawn while loading with no rows to show. Default 0. */
+  skeletonRows?: number;
 };
+
+/**
+ * Placeholder rows while the first rows load: same cells as a data row, so the layout does
+ * not jump, but no `btt-row` class and hidden from assistive technology.
+ */
+function SkeletonRows({ count, colSpan }: { count: number; colSpan: number }) {
+  const cells = Array.from({ length: colSpan }, (_, cell) => (
+    <td key={cell} className="btt-cell btt-skeleton-cell">
+      <span className="btt-skeleton" />
+    </td>
+  ));
+  return Array.from({ length: count }, (_, row) => (
+    <tr key={row} className="btt-skeleton-row" aria-hidden="true">
+      {cells}
+    </tr>
+  ));
+}
+
+type EmptyBodyProps = { loading: boolean; colSpan: number; skeletonRows: number; emptyMessage: ReactNode; className?: string };
+
+/** The body without rows: skeleton rows while loading, else the empty message. */
+function EmptyBody({ loading, colSpan, skeletonRows, emptyMessage, className }: EmptyBodyProps) {
+  return (
+    <tbody className={className}>
+      {loading ? (
+        <SkeletonRows count={skeletonRows} colSpan={colSpan} />
+      ) : (
+        <tr className="btt-empty-row">
+          <td className="btt-empty" colSpan={colSpan}>
+            {emptyMessage}
+          </td>
+        </tr>
+      )}
+    </tbody>
+  );
+}
 
 /** Stands in for unmounted rows: one cell spanning every column, no widths, hidden from assistive technology. */
 function Spacer({ height, colSpan }: { height: number; colSpan: number }) {
@@ -130,24 +168,15 @@ function Spacer({ height, colSpan }: { height: number; colSpan: number }) {
 
 /**
  * The `<tbody>`: one memoized row per mounted entry, keyed by row id, between the spacers
- * of `range`, or the empty message (hidden while loading). Driven by a list of
- * `RowEntry`, whatever the data source.
+ * of `range`, or the empty message. Driven by a list of
+ * `RowEntry`, whatever the data source. While loading with no rows it draws
+ * `skeletonRows` placeholder rows instead of the empty message.
  */
 export function TableBody<R>(props: TableBodyProps<R>) {
-  const { entries, columns, selectable, loading, emptyMessage, range, selection, headerRows = 1, className, ...callbacks } = props;
+  const { entries, columns, selectable, loading, emptyMessage, range, selection, headerRows = 1, className, skeletonRows = 0, ...callbacks } = props;
   const colSpan = columns.length + (selectable ? 1 : 0);
   if (entries.length === 0) {
-    return (
-      <tbody className={className}>
-        {!loading && (
-          <tr className="btt-empty-row">
-            <td className="btt-empty" colSpan={colSpan}>
-              {emptyMessage}
-            </td>
-          </tr>
-        )}
-      </tbody>
-    );
+    return <EmptyBody loading={loading} colSpan={colSpan} skeletonRows={skeletonRows} emptyMessage={emptyMessage} className={className} />;
   }
   const { start = 0, end = entries.length, padTop = 0, padBottom = 0 } = range ?? {};
   return (
