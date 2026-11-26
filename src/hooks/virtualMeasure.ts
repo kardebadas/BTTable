@@ -96,6 +96,8 @@ export function applyMeasurements<R>(shared: Shared<R>, { elements, toggled = []
   const rendered = spaceOf(live, tree.total);
   const anchor = tree.rowAt(pos.top);
   const anchorTop = tree.offset(anchor);
+  // A detail row the user opened or closed grows or shrinks the view around that row: keep it in place, not the bottom.
+  if (toggled.length > 0) live.pinned = false;
   const reset = resetHeights(shared.cache, live, toggled);
   const stored = storeHeights(shared.cache, live, measure(live, elements));
   if (!stored && !reset && !force) return;

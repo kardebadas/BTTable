@@ -94,9 +94,11 @@ export type BTTableCommonProps<R> = RowCallbacks<R> &
 
 /**
  * Client mode: the rows in memory, an array or an object map (values in property order,
- * keys as the id fallback). Should be stable (memoized): a new array re-filters and
- * re-sorts every row; it keeps the scroll position unless the view (page, sort, search,
- * filters) changes.
+ * keys as the id fallback). Immutable: an edit must pass a new array (or map). Sort, filter
+ * and search values are cached per array, so a row changed in place, or a new row object
+ * put into the same array, keeps sorting, filtering and matching on its old values. Pass
+ * the same array while the data is unchanged: a new one re-filters and re-sorts every row;
+ * it keeps the scroll position unless the view (page, sort, search, filters) changes.
  */
 export type BTTableClientProps<R> = BTTableCommonProps<R> & { rows: RowSource<R>; fetchRows?: never; fetchAllRows?: never } & NoManualProps;
 

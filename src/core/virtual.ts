@@ -62,10 +62,12 @@ export function virtualWindow(input: VirtualWindowInput): VirtualWindow {
   const start = Math.max(0, offsets.rowAt(scrollTop) - overscan);
   const end = Math.min(count, offsets.rowAt(scrollTop + viewportHeight) + 1 + overscan);
   const total = offsets.offset(count);
-  // A whole-pixel top spacer and a bottom one taking the rest keep the body exactly `space` tall.
-  const padTop = Math.max(0, Math.floor(offsets.offset(start) - delta));
+  const space = input.space ?? total;
+  // Scaled: a whole-pixel top spacer and a bottom one taking the rest keep the body exactly `space` tall.
+  const top = offsets.offset(start) - delta;
+  const padTop = Math.max(0, space < total ? Math.floor(top) : top);
   const mounted = offsets.offset(end) - offsets.offset(start);
-  return { start, end, padTop, padBottom: Math.max(0, (input.space ?? total) - padTop - mounted) };
+  return { start, end, padTop, padBottom: Math.max(0, space - padTop - mounted) };
 }
 
 /** `virtualize` prop: `'auto'` turns virtualization on above the row threshold. */

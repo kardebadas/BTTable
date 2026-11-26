@@ -187,7 +187,8 @@ heap is measured before any search; the search texts add to it once search is us
 - **Cached search/filter keys** (`src/hooks/rowIndex.ts`). Per `rows` × `columns`, each
   row's lowercase search text and each filter column's `filterKey` are computed once and
   stored by row index, so a keystroke is one `includes` per row, and a term that extends the
-  previous one only rechecks the previous result.
+  previous one only rechecks the previous result. The cache lives as long as the `rows` array, so
+  rows edited in place keep their old keys: edits must pass a new array (as documented).
 - **Rank-based counting sort** (`src/core/sortRanks.ts`). Per sort column, every row's sort
   key is turned once into a dense integer rank (radix sort for numbers, sorted words for
   text); a sort is then a stable O(n) counting sort on ranks, in either direction, giving the

@@ -99,6 +99,16 @@ describe('virtualWindow', () => {
     });
   });
 
+  it('keeps a fractional top spacer below the cap (fractional row heights)', () => {
+    const window = virtualWindow({ offsets: uniform(100, 10.5), scrollTop: 500, viewportHeight: 50, overscan: 8 });
+    expect(window.padTop).toBe(39 * 10.5);
+  });
+
+  it('floors the top spacer when the scroll space is capped', () => {
+    const window = virtualWindow({ offsets: uniform(100, 10.5), scrollTop: 500, viewportHeight: 50, overscan: 8, space: 1000 });
+    expect(window.padTop).toBe(409);
+  });
+
   it('copes with a scroll position past the end (a list that just shrank)', () => {
     const window = virtualWindow({ offsets: uniform(10, 10), scrollTop: 5000, viewportHeight: 50, overscan: 2 });
     expect(window).toEqual({ start: 7, end: 10, padTop: 70, padBottom: 0 });

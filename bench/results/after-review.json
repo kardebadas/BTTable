@@ -1,0 +1,401 @@
+{
+  "label": "after-review",
+  "machine": {
+    "cpu": "AMD Ryzen 7 5800X3D 8-Core Processor",
+    "cores": 12,
+    "node": "v24.22.3",
+    "date": "2026-11-26T11:11:39.885Z"
+  },
+  "results": [
+    {
+      "browser": "chrome",
+      "version": "157.0.8103.78",
+      "n": 1000000,
+      "steps": {
+        "load": {
+          "ms": 1516,
+          "value": {
+            "genMs": 1206.6000001430511,
+            "firstRowsMs": 225.29999995231628,
+            "navToRowsMs": 1518.5999999046326
+          }
+        },
+        "heap": {
+          "ms": 347,
+          "value": {
+            "jsHeapMB": 462
+          }
+        },
+        "offsetsPass": {
+          "ms": 371,
+          "value": {
+            "medianMs": 0.0011000001430511474,
+            "buildMs": 28.799999952316284
+          }
+        },
+        "wheel": {
+          "ms": 3173,
+          "value": {
+            "frames": {
+              "count": 185,
+              "p50": 16.699999999999818,
+              "p95": 16.800000000000182,
+              "max": 16.800000000000182,
+              "total": 3083.2
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 180,
+              "p50": 0,
+              "p95": 0.10000014305114746,
+              "max": 0.10000014305114746,
+              "total": 5.999999284744263
+            },
+            "wheelEvents": 180,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 178430,
+            "scrollHeight": 15000056,
+            "clientHeight": 598,
+            "lastMountedId": 2522
+          }
+        },
+        "drag": {
+          "ms": 3221,
+          "value": {
+            "frames": {
+              "count": 184,
+              "p50": 16.699999999999818,
+              "p95": 16.700000000000728,
+              "max": 16.800000000000182,
+              "total": 3066.5999999999995
+            },
+            "headerDriftPx": 0,
+            "dragMoved": true,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 14999460,
+            "scrollHeight": 15000057,
+            "clientHeight": 598,
+            "lastMountedId": 1000000
+          }
+        },
+        "endKey": {
+          "ms": 194,
+          "value": {
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 14999460,
+            "scrollHeight": 15000057,
+            "clientHeight": 598,
+            "lastMountedId": 1000000
+          }
+        },
+        "scrollTopMax": {
+          "ms": 168,
+          "value": {
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 14999460,
+            "scrollHeight": 15000057,
+            "clientHeight": 598,
+            "lastMountedId": 1000000
+          }
+        },
+        "scrollToRow": {
+          "ms": 283,
+          "value": {
+            "accepted": true,
+            "msToVisible": 117.40000009536743,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 14999460,
+            "scrollHeight": 15000057,
+            "clientHeight": 598,
+            "lastMountedId": 1000000
+          }
+        },
+        "sort": {
+          "ms": 1115,
+          "value": {
+            "ascMs": 439.59999990463257,
+            "descMs": 199.79999995231628
+          }
+        },
+        "search": {
+          "ms": 2433,
+          "value": {
+            "term": "lopes",
+            "queryMs": 1770.4000000953674,
+            "matchedRows": 83404,
+            "clearMs": 63.5,
+            "laterMs": 110.29999995231628
+          }
+        },
+        "selectAll": {
+          "ms": 600,
+          "value": {
+            "selectMs": 171.89999985694885,
+            "clearMs": 118.59999990463257
+          }
+        },
+        "profileWheel": {
+          "ms": 4086,
+          "value": [
+            {
+              "fn": "(idle) :0",
+              "selfMs": 2116
+            },
+            {
+              "fn": "(program) :0",
+              "selfMs": 1199
+            },
+            {
+              "fn": "applyMeasurements index-0_gycmLY.js:16275",
+              "selfMs": 480
+            },
+            {
+              "fn": "removeChild :0",
+              "selfMs": 22
+            },
+            {
+              "fn": "getBoundingClientRect :0",
+              "selfMs": 17
+            },
+            {
+              "fn": "setAttribute :0",
+              "selfMs": 16
+            },
+            {
+              "fn": "commitPassiveUnmountEffectsInsideOfDeletedTree_begin index-0_gycmLY.js:7660",
+              "selfMs": 11
+            },
+            {
+              "fn": "Cell index-0_gycmLY.js:13622",
+              "selfMs": 10
+            },
+            {
+              "fn": "completeWork index-0_gycmLY.js:5809",
+              "selfMs": 9
+            },
+            {
+              "fn": "setTextContent index-0_gycmLY.js:1816",
+              "selfMs": 9
+            },
+            {
+              "fn": "createElement :0",
+              "selfMs": 9
+            },
+            {
+              "fn": "appendChild :0",
+              "selfMs": 7
+            }
+          ]
+        },
+        "profileSearch": {
+          "ms": 1521,
+          "value": [
+            {
+              "fn": "(program) :0",
+              "selfMs": 829
+            },
+            {
+              "fn": "(idle) :0",
+              "selfMs": 449
+            },
+            {
+              "fn": "(anonymous) index-0_gycmLY.js:14255",
+              "selfMs": 103
+            },
+            {
+              "fn": "buildTree index-0_gycmLY.js:16206",
+              "selfMs": 69
+            },
+            {
+              "fn": "(anonymous) index-0_gycmLY.js:15236",
+              "selfMs": 25
+            },
+            {
+              "fn": "scrollToTop index-0_gycmLY.js:16519",
+              "selfMs": 9
+            },
+            {
+              "fn": "search index-0_gycmLY.js:14247",
+              "selfMs": 7
+            },
+            {
+              "fn": "applyMeasurements index-0_gycmLY.js:16275",
+              "selfMs": 3
+            },
+            {
+              "fn": "paginate index-0_gycmLY.js:13044",
+              "selfMs": 2
+            },
+            {
+              "fn": "scrollState index-0_gycmLY.js:17200",
+              "selfMs": 1
+            },
+            {
+              "fn": "createElement :0",
+              "selfMs": 1
+            },
+            {
+              "fn": "(anonymous) :0",
+              "selfMs": 1
+            }
+          ]
+        },
+        "searchAfterFocus": {
+          "ms": 4492,
+          "value": {
+            "waitMs": 2000,
+            "term": "lopes",
+            "queryMs": 153.10000014305115,
+            "matchedRows": 83404,
+            "clearMs": 53.799999952316284,
+            "laterMs": 109.09999990463257
+          }
+        }
+      }
+    },
+    {
+      "browser": "firefox",
+      "version": "151.0",
+      "n": 1000000,
+      "steps": {
+        "load": {
+          "ms": 2754,
+          "value": {
+            "genMs": 2342,
+            "firstRowsMs": 295,
+            "navToRowsMs": 2845
+          }
+        },
+        "heap": {
+          "ms": 0,
+          "value": {
+            "skipped": "no CDP"
+          }
+        },
+        "offsetsPass": {
+          "ms": 647,
+          "value": {
+            "medianMs": 0.001,
+            "buildMs": 32
+          }
+        },
+        "wheel": {
+          "ms": 3249,
+          "value": {
+            "frames": {
+              "count": 188,
+              "p50": 17.079999999999927,
+              "p95": 17.11999999999989,
+              "max": 17.300000000000182,
+              "total": 3133.22
+            },
+            "headerDriftPx": 0,
+            "resize": {
+              "count": 181,
+              "p50": 0,
+              "p95": 0,
+              "max": 1,
+              "total": 7
+            },
+            "wheelEvents": 181,
+            "inDom": false,
+            "visible": false,
+            "scrollTop": 102084,
+            "scrollHeight": 15000058,
+            "clientHeight": 598,
+            "lastMountedId": 1002
+          }
+        },
+        "drag": {
+          "ms": 80,
+          "value": {
+            "skipped": "no scrollbar"
+          }
+        },
+        "endKey": {
+          "ms": 234,
+          "value": {
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 14999459,
+            "scrollHeight": 15000058,
+            "clientHeight": 598,
+            "lastMountedId": 1000000
+          }
+        },
+        "scrollTopMax": {
+          "ms": 167,
+          "value": {
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 14999459,
+            "scrollHeight": 15000058,
+            "clientHeight": 598,
+            "lastMountedId": 1000000
+          }
+        },
+        "scrollToRow": {
+          "ms": 432,
+          "value": {
+            "accepted": true,
+            "msToVisible": 272,
+            "inDom": true,
+            "visible": true,
+            "scrollTop": 14999459,
+            "scrollHeight": 15000058,
+            "clientHeight": 598,
+            "lastMountedId": 1000000
+          }
+        },
+        "sort": {
+          "ms": 1332,
+          "value": {
+            "ascMs": 493,
+            "descMs": 281
+          }
+        },
+        "search": {
+          "ms": 4084,
+          "value": {
+            "term": "lopes",
+            "queryMs": 3288,
+            "matchedRows": 83404,
+            "clearMs": 75,
+            "laterMs": 116
+          }
+        },
+        "selectAll": {
+          "ms": 684,
+          "value": {
+            "selectMs": 164,
+            "clearMs": 165
+          }
+        },
+        "profileWheel": {
+          "ms": 0,
+          "value": null
+        },
+        "profileSearch": {
+          "ms": 0,
+          "value": null
+        },
+        "searchAfterFocus": {
+          "ms": 7015,
+          "value": {
+            "waitMs": 2000,
+            "term": "lopes",
+            "queryMs": 1456,
+            "matchedRows": 83404,
+            "clearMs": 70,
+            "laterMs": 114
+          }
+        }
+      }
+    }
+  ]
+}

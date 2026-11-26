@@ -5,7 +5,7 @@ import { BTTable } from './BTTable';
 import type { BTTableClientProps } from './BTTableProps';
 import { MAX_SCROLL_SPACE } from './core/scrollMap';
 import type { BTTableHandle } from './hooks/useTableHandle';
-import { COLUMNS, geometry, installFakeGeometry, makeRows, mountedIds, range, rowElement, rowProps, type Row, scroller, scrollTo, spacers } from './testing/virtualFixture';
+import { COLUMNS, geometry, installFakeGeometry, makeRows, MockResizeObserver, mountedIds, range, rowElement, rowProps, type Row, scroller, scrollTo, spacers } from './testing/virtualFixture';
 
 installFakeGeometry();
 
@@ -115,6 +115,100 @@ describe('the bottom of the list', () => {
     act(() => void fireEvent.pointerUp(window));
     expect(bodyHeight(container, 60)).toBeGreaterThan(frozen);
     expect(scroller(container).scrollTop).toBe(bodyHeight(container, 60) - 200);
+  });
+});
+
+const detail = ({ row }: { row: Row }) => <div className="detail-body">{`Detail ${row.id}`}</div>;
+
+/** 1000 rows of 40 px scrolled to the bottom; `screenTop` is row 996's top in the viewport (40 px). */
+function atBottom(props: Partial<BTTableClientProps<Row>> = {}) {
+  for (const id of range(0, 1000)) geometry.heights.set(id, 40);
+  const view = setup({ renderDetail: detail, ...props });
+  scrollTo(view.container, 1000 * 40 - 200);
+  return { ...view, screenTop: () => 996 * 40 - scroller(view.container).scrollTop };
+}
+
+describe('growth from a row the user works with, at the bottom', () => {
+  it('opening a detail row keeps that row in place', () => {
+    geometry.detailHeight = 160;
+    const { container, screenTop } = atBottom();
+    expect(screenTop()).toBe(40);
+    fireEvent.click(rowElement(container, 996).querySelector('.btt-expand') as HTMLElement);
+    expect(screenTop()).toBe(40);
+  });
+
+  it('a row pressed and then grown keeps its place', () => {
+    const { container, screenTop } = atBottom();
+    fireEvent.pointerDown(rowElement(container, 996));
+    geometry.heights.set(996, 200);
+    MockResizeObserver.instances.at(-1)?.trigger([rowElement(container, 996)]);
+    expect(screenTop()).toBe(40);
+  });
+});
+
+const sizers = (container: HTMLElement) => scroller(container).querySelectorAll(':scope > div[aria-hidden="true"]');
+
+describe('thumb drag freeze', () => {
+  it('ends when virtualization turns off and back on mid-drag', () => {
+    for (const id of range(0, 3000)) geometry.heights.set(id, 40);
+    const rows = makeRows(1000);
+    const view = setup({ rows, virtualize: true });
+    fireEvent.pointerDown(scroller(view.container));
+    view.rerender(<BTTable columns={COLUMNS} rows={rows} pagination={false} rowProps={rowProps} virtualize={false} />);
+    view.rerender(<BTTable columns={COLUMNS} rows={makeRows(3000)} pagination={false} rowProps={rowProps} virtualize />);
+    expect(bodyHeight(view.container, 40)).toBe(120_000);
+  });
+
+  it('a second press replaces the first one and one release ends both', () => {
+    const { container } = setup();
+    fireEvent.pointerDown(scroller(container));
+    fireEvent.pointerDown(scroller(container));
+    expect(sizers(container)).toHaveLength(1);
+    act(() => void fireEvent.pointerUp(window));
+    expect(sizers(container)).toHaveLength(0);
+  });
+
+  it.each([['pointercancel', () => fireEvent.pointerCancel(window)], ['window blur', () => fireEvent.blur(window)]])('ends on %s', (_name, end) => {
+    const { container } = setup();
+    fireEvent.pointerDown(scroller(container));
+    act(() => void end());
+    expect(sizers(container)).toHaveLength(0);
+  });
+
+  it('restores the inline position exactly, priority included', () => {
+    const { container } = setup();
+    scroller(container).style.setProperty('position', 'static', 'important');
+    fireEvent.pointerDown(scroller(container));
+    act(() => void fireEvent.pointerUp(window));
+    expect(scroller(container).style.getPropertyValue('position')).toBe('static');
+    expect(scroller(container).style.getPropertyPriority('position')).toBe('important');
+  });
+
+  it('leaves nothing behind when unmounted mid-drag', () => {
+    const { container, unmount } = setup();
+    const element = scroller(container);
+    fireEvent.pointerDown(element);
+    unmount();
+    expect(element.querySelectorAll(':scope > div[aria-hidden="true"]')).toHaveLength(0);
+  });
+});
+
+describe('End inside a row', () => {
+  it('is left to a detail row', () => {
+    tallerRows();
+    const { container } = setup({ renderDetail: detail, defaultExpandedIds: [1] });
+    fireEvent.keyDown(container.querySelector('.detail-body') as Element, { key: 'End' });
+    expect(scroller(container).scrollTop).toBe(0);
+  });
+
+  it('is left to an element that scrolls on its own', () => {
+    tallerRows();
+    const columns = [COLUMNS[0], { key: 'name', header: 'Name', render: () => <div className="own-scroll" style={{ overflowY: 'auto' }} /> }];
+    const { container } = setup({ columns });
+    const own = container.querySelector('.own-scroll') as HTMLElement;
+    Object.defineProperty(own, 'scrollHeight', { value: 500 });
+    fireEvent.keyDown(own, { key: 'End' });
+    expect(scroller(container).scrollTop).toBe(0);
   });
 });
 

@@ -141,11 +141,28 @@ function editing(event: KeyboardEvent): boolean {
   return Boolean(target?.isContentEditable) || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? '');
 }
 
-/** True when End belongs to the scroll container: focus is in it, or nothing is focused and it was the last thing clicked. */
+/** True when an element between `target` and `row` (both included) scrolls on its own: End there is its own. */
+function scrollsInside(target: Element, row: Element): boolean {
+  for (let element: Element | null = target; element && element !== row.parentElement; element = element.parentElement) {
+    if (element.scrollHeight > element.clientHeight && /auto|scroll/.test(getComputedStyle(element).overflowY)) return true;
+  }
+  return false;
+}
+
+/** True when End on `target` belongs to the scroll container: the container itself, or a non-scrolling part of one of its data rows. */
+function ownsTarget(scroller: HTMLElement, target: EventTarget | null): boolean {
+  if (target === scroller) return true;
+  if (!(target instanceof Element)) return false;
+  const row = target.closest('tr.btt-row, tr.btt-detail-row');
+  if (!row?.classList.contains('btt-row') || row.closest('.btt-scroll') !== scroller) return false;
+  return !scrollsInside(target, row);
+}
+
+/** True when End belongs to the scroll container: focus is on it or in a data row, or nothing is focused and that was the last thing clicked. */
 function ownsKeys(scroller: HTMLElement, event: KeyboardEvent, clickedInside: boolean): boolean {
-  const target = event.target as Node | null;
-  if (target && scroller.contains(target)) return true;
-  return clickedInside && (target === document.body || target === document.documentElement);
+  const target = event.target;
+  if (target === document.body || target === document.documentElement) return clickedInside;
+  return ownsTarget(scroller, target);
 }
 
 /**
@@ -159,7 +176,7 @@ export function useEndKey<R>(enabled: boolean, shared: Shared<R>): void {
     if (!enabled || !scroller) return;
     let clickedInside = false;
     const onPointer = (event: Event) => {
-      clickedInside = scroller.contains(event.target as Node | null);
+      clickedInside = ownsTarget(scroller, event.target);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'End' || event.defaultPrevented || event.altKey || editing(event)) return;
@@ -200,18 +217,19 @@ export function useScrollTracking<R>(enabled: boolean, shared: Shared<R>): void 
 /**
  * Holds the container's scroll height for a thumb drag: an empty element ending where the
  * content ends now, so the sub-pixel rounding of the rows' layout cannot lower the height a pixel.
- * Removing it restores the container.
+ * Removing it restores the container, its inline `position` included.
  */
 function holdScrollHeight(scroller: HTMLElement): () => void {
   const sizer = document.createElement('div');
   sizer.setAttribute('aria-hidden', 'true');
   Object.assign(sizer.style, { position: 'absolute', left: '0', top: `${scroller.scrollHeight - 1}px`, width: '1px', height: '1px', visibility: 'hidden' });
-  const position = scroller.style.position;
-  if (getComputedStyle(scroller).position === 'static') scroller.style.position = 'relative';
+  const style = scroller.style;
+  const position = { value: style.getPropertyValue('position'), priority: style.getPropertyPriority('position') };
+  if (getComputedStyle(scroller).position === 'static') style.position = 'relative';
   scroller.appendChild(sizer);
   return () => {
     sizer.remove();
-    scroller.style.position = position;
+    style.setProperty('position', position.value, position.priority);
   };
 }
 
@@ -221,36 +239,48 @@ function setDragSpace<R>(shared: Shared<R>, space: number | null): void {
   shared.setters.setDragSpace(space);
 }
 
+/** True for a press on the container's own scrollbar: on the container itself, right of its content box. */
+function onScrollbar(scroller: HTMLElement, event: MouseEvent): boolean {
+  return event.target === scroller && !(event.offsetX < scroller.clientWidth);
+}
+
 /**
- * Notes a pointer held on the container's own scrollbar (a press on the container itself,
- * right of its content box) and freezes the body height meanwhile; `onRelease` runs when it lets go.
+ * Notes a pointer held on the container's own scrollbar and freezes the body height
+ * meanwhile; `onRelease` runs when it lets go (pointer up or cancel, window blur). A press
+ * on a row ends bottom pinning: what the user does there may change its height.
  */
 export function useScrollbarDrag<R>(enabled: boolean, shared: Shared<R>, onRelease: () => void): void {
   useEffect(() => {
     const scroller = shared.scrollRef.current;
     if (!enabled || !scroller) return;
     const live = shared.live.current;
-    let unhold = () => {};
+    let unhold: (() => void) | null = null;
+    const thaw = () => {
+      unhold?.();
+      unhold = null;
+      setDragSpace(shared, null);
+    };
     const press = (event: MouseEvent) => {
-      if (event.target !== scroller || event.offsetX < scroller.clientWidth) return;
+      if (!onScrollbar(scroller, event)) {
+        live.pinned = false;
+        return;
+      }
+      unhold?.();
       setDragSpace(shared, spaceOf(live, live.tree.total));
       unhold = holdScrollHeight(scroller);
     };
     const release = () => {
       if (live.dragSpace === null) return;
-      unhold();
-      setDragSpace(shared, null);
+      thaw();
       onRelease();
     };
+    const events = ['pointerup', 'pointercancel', 'mouseup', 'blur'];
     scroller.addEventListener('pointerdown', press);
-    window.addEventListener('pointerup', release);
-    window.addEventListener('mouseup', release);
+    events.forEach((name) => window.addEventListener(name, release));
     return () => {
       scroller.removeEventListener('pointerdown', press);
-      window.removeEventListener('pointerup', release);
-      window.removeEventListener('mouseup', release);
-      unhold();
-      live.dragSpace = null;
+      events.forEach((name) => window.removeEventListener(name, release));
+      thaw();
     };
   }, [enabled, shared, onRelease]);
 }
